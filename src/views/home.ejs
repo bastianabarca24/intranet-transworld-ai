@@ -1,0 +1,315 @@
+<%
+  // Funciones auxiliares
+  function titleCase(s) {
+    if (!s) return '';
+    const capitalize = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    return String(s)
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) =>
+        word
+          .split('-')
+          .map((segment) => capitalize(segment))
+          .join('-')
+      )
+      .join(' ');
+  }
+  
+  function formatDateShort(dateString) {
+    const d = new Date(dateString);
+    const dia = d.getDate();
+    const mes = d.toLocaleString('es-CL', { month: 'short' });
+    return `${dia}-${mes.replace('.','')}`;
+  }
+
+  const mesNum = new Date().getMonth() + 1;
+  let cumpleaniosOrdenados = [];
+  if (typeof cumpleaniosMes !== 'undefined' && cumpleaniosMes) {
+    cumpleaniosOrdenados = [...cumpleaniosMes].sort((a, b) => {
+      const dHoy = (typeof diaHoy !== 'undefined') ? diaHoy : new Date().getDate(); 
+      const aPasado = a.dia < dHoy; const bPasado = b.dia < dHoy;
+      if (aPasado !== bPasado) return aPasado ? 1 : -1;
+      return a.dia - b.dia;
+    });
+  }
+%>
+
+<div class="home-page">
+<div class="home-grid-top">
+  
+  <div class="home-stack">
+    <div class="indicators-row">
+      <a href="https://si3.bcentral.cl/indicadoressiete/secure/Serie.aspx?gcode=PRE_TCO&param=RABmAFYAWQB3AGYAaQBuAEkALQAzADUAbgBNAGgAaAAkADUAVwBQAC4AbQBYADAARwBOAGUAYwBjACMAQQBaAHAARgBhAGcAUABTAGUAdwA1ADQAMQA0AE0AawBLAF8AdQBDACQASABzAG0AXwA2AHQAawBvAFcAZwBKAEwAegBzAF8AbgBMAHIAYgBDAC4ARQA3AFUAVwB4AFIAWQBhAEEAOABkAHkAZwAxAEEARAA=" target="_blank" class="indicator-badge <%= finanzas.dolar.tendencia === 'bajista' ? 'bg-down' : (finanzas.dolar.tendencia === 'alcista' ? 'bg-up' : 'bg-equal') %>">
+        <span>$ USD</span>
+        <span><%= (finanzas.dolar && finanzas.dolar.valor) ?
+          finanzas.dolar.valor : '---' %> <%= finanzas.dolar.tendencia === 'alcista' ? '⬆' : (finanzas.dolar.tendencia === 'bajista' ? '⬇' : '=') %></span>
+      </a>
+      
+      <a href="https://si3.bcentral.cl/IndicadoresSiete/secure/Serie.aspx?gcode=PRE_EUR&param=cgBnAE8AOQBlAGcAIwBiAFUALQBsAEcAYgBOAEkASQBCAEcAegBFAFkAeABkADgASAA2AG8AdgB2AFMAUgBYADIAQwBzAEEARQBMAG8ASgBWADQATABrAGQAZAB1ADIAeQBBAFAAZwBhADIAbABWAHcAXwBXAGgATAAkAFIAVAB1AEIAbAB3AFoAdQBRAFgAZwA5AHgAdgAwACQATwBZADcAMwAuAGIARwBFAFIASwAuAHQA" target="_blank" class="indicator-badge <%= finanzas.euro.tendencia === 'bajista' ? 'bg-down' : (finanzas.euro.tendencia === 'alcista' ? 'bg-up' : 'bg-equal') %>">
+        <span>€ EUR</span>
+        <span><%= (finanzas.euro && finanzas.euro.valor) ?
+          finanzas.euro.valor : '---' %> <%= finanzas.euro.tendencia === 'alcista' ? '⬆' : (finanzas.euro.tendencia === 'bajista' ? '⬇' : '=') %></span>
+      </a>
+
+      <a href="https://si3.bcentral.cl/IndicadoresSiete/secure/Serie.aspx?gcode=UF&param=RABmAFYAWQB3AGYAaQBuAEkALQAzADUAbgBNAGgAaAAkADUAVwBQAC4AbQBYADAARwBOAGUAYwBjACMAQQBaAHAARgBhAGcAUABTAGUAYwBsAEMAMQA0AE0AawBLAF8AdQBDACQASABzAG0AXwA2AHQAawBvAFcAZwBKAEwAegBzAF8AbgBMAHIAYgBDAC4ARQA3AFUAVwB4AFIAWQBhAEEAOABkAHkAZwAxAEEARAA=" target="_blank" class="indicator-badge <%= finanzas.uf.tendencia === 'bajista' ? 'bg-down' : (finanzas.uf.tendencia === 'alcista' ? 'bg-up' : 'bg-equal') %>">
+        <span>UF</span>
+        <span><%= (finanzas.uf && finanzas.uf.valor) ?
+          finanzas.uf.valor : '---' %> <%= finanzas.uf.tendencia === 'alcista' ? '⬆' : (finanzas.uf.tendencia === 'bajista' ? '⬇' : '=') %></span>
+      </a>
+    </div>
+
+    <div class="widgets-row">
+      <div class="widget-box widget-box-interactive" onclick="window.open('https://www.meteored.cl/tiempo-en_Santiago+de+Chile-America+Sur-Chile-Region+Metropolitana+de+Santiago-SCEL-1-18578.html', '_blank')" title="Ver clima detallado">
+        <div class="weather-layout">
+           <div class="weather-icon-big">
+             <%= (typeof clima !== 'undefined') ?
+               clima.icon : '☀️' %>
+           </div>
+           <div class="weather-info-col">
+             <div class="weather-temp-big">
+                <%= (typeof clima !== 'undefined') ?
+                  clima.temp : '--' %>°C
+             </div>
+             <div class="weather-city-small">
+                <%= (typeof clima !== 'undefined' && clima.desc) ?
+                  clima.desc : 'Santiago' %>
+             </div>
+           </div>
+        </div>
+      </div>
+
+      <div class="widget-box widget-box-interactive menu-widget-box" onclick="IntranetModal.open('modalVerMenu')" title="Ver menú de la semana">
+        <% if (typeof isAdministrador !== 'undefined' && isAdministrador) { %>
+          <button onclick="event.stopPropagation(); IntranetModal.open('modalPlatos')" class="menu-edit-button" title="Editar Menú de la Semana">✏️</button>
+        <% } %>
+        
+        <span class="menu-widget-icon">🍽️</span>
+        <span class="widget-title menu-widget-title">Menú de hoy</span>
+        <span class="widget-value menu-widget-value"><%= typeof platoDelDia !== 'undefined' ?
+          platoDelDia : 'No definido' %></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="botones-duales-container">
+    <a href="https://www.transworld.cl/" target="_blank" class="btn-dual btn-sitio">
+      <img src="/img/favicon2.png" alt="Transworld" class="btn-dual-img btn-dual-img-large">
+      <span class="btn-dual-text">Sitio Web</span>
+      <span class="btn-dual-sub">transworld.cl</span>
+    </a>
+    <a href="/cursos" class="btn-dual btn-cursos">
+      <img src="/img/LOGO-TRANSWORLD-ACADEMY.png" alt="Transworld Academy" class="btn-dual-img btn-dual-img-large">
+      <span class="btn-dual-text">Cursos</span>
+      <span class="btn-dual-sub btn-dual-sub-muted">Capacitaciones</span>
+    </a>
+  </div>
+</div>
+
+<div class="home-grid-bottom">
+  
+  <div class="home-stack">
+    <div>
+      <h3 class="section-header">NOTICIAS INTERNAS</h3>
+      <div class="news-container">
+        <% if (mixedCarousel && mixedCarousel.length > 0) { %>
+          <% mixedCarousel.slice(0, 5).forEach(news => { %>
+            <a href="<%= news.link %>" class="news-list-item">
+               <div class="news-date-box">
+                 <%= formatDateShort(news.fecha).toUpperCase() %>
+              </div>
+              <div class="news-title-text" title="<%= news.titulo %>">
+                <%= news.titulo %>
+              </div>
+            </a>
+          <% }); %>
+        <% } else { %>
+          <p class="home-empty-news">No hay noticias recientes.</p>
+        <% } %>
+        
+        <a href="/noticias" class="btn-ver-mas-news">Ver más</a>
+      </div>
+    </div>
+
+    <div>
+      <h3 class="section-header">CUMPLEAÑOS <%= (typeof mesNombre !== 'undefined') ? mesNombre : '' %></h3>
+      <div class="cumple-container">
+        <% if (!cumpleaniosOrdenados || cumpleaniosOrdenados.length === 0) { %>
+          <p>No hay cumpleaños registrados.</p>
+        <% } else { %>
+          <% 
+            // Obtenemos el número del día de hoy para compararlo
+            const hoyDia = new Date().getDate(); 
+          %>
+          <div id="lista-cumpleanos">
+            <% cumpleaniosOrdenados.forEach((p, index) => { 
+              let ocultoClass = (index >= 3) ? 'is-hidden' : '';
+              // Verificamos si el día coincide
+              let esHoy = (Number(p.dia) === hoyDia);
+            %>
+              <div class="cumple-row item-cumple <%= esHoy ? 'cumple-hoy' : '' %> <%= ocultoClass %>">
+                <div class="cumple-date-col">
+                  <%= p.dia %>/<%= mesNum %>
+                </div>
+          
+                <div class="cumple-info-col">
+                  <div class="cumple-name"><%= titleCase(p.nombre) %></div>
+                  <div class="cumple-dept"><%= titleCase(p.area) %></div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+          
+          <% if (cumpleaniosOrdenados.length > 3) { %>
+            <button id="btn-ver-mas-cumple" class="btn-ver-mas-cumple" onclick="toggleCumpleanios()">
+              Ver más...
+            </button>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <h3 class="section-header">COMUNICACIONES</h3>
+    
+    <div class="linkedin-carousel">
+      <button class="nav-arrow prev" onclick="moveLinkedin(-1)">&#10094;</button>
+      <button class="nav-arrow next" onclick="moveLinkedin(1)">&#10095;</button>
+
+      <% if (typeof linkedinFeed !== 'undefined' && linkedinFeed.length > 0) { %>
+        <% linkedinFeed.forEach((post, index) => { %>
+          <div class="linkedin-slide <%= index === 0 ? 'active' : '' %>">
+ 
+            <a href="<%= post.enlace_url %>" target="_blank" class="linkedin-link-full" title="<%= post.texto %>">
+              
+              <% if (post.imagen_url === '/img/fondo-home.png') { %>
+                <% 
+                  // Extraer dinámicamente los 2 primeros párrafos que tengan contenido
+                  let parrafos = (post.texto || '').split('\n').filter(p => p.trim().length > 0);
+                  let textoResumen = parrafos.slice(0, 2).join('<br><br>');
+                %>
+                <div class="linkedin-text-card">
+                  
+                  <div class="linkedin-text-summary">
+                    <%- textoResumen %>
+                  </div>
+
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="70" height="70" fill="#0a66c2" class="linkedin-icon">
+          
+                    <path d="M20.5 2h-17A1.5 1.5 0 002 3.5v17A1.5 1.5 0 003.5 22h17a1.5 1.5 0 001.5-1.5v-17A1.5 1.5 0 0020.5 2zM8 19H5v-9h3zM6.5 8.25A1.75 1.75 0 118.3 6.5a1.78 1.78 0 01-1.8 1.75zM19 19h-3v-4.74c0-1.42-.6-1.93-1.38-1.93A1.74 1.74 0 0013 14.19a.66.66 0 000 .14V19h-3v-9h2.9v1.3a3.11 3.11 0 012.7-1.4c1.55 0 3.36.86 3.36 3.66z"></path>
+                  </svg>
+
+                  <p class="linkedin-cta">
+                    Haga click para ver más...
+                  </p>
+                </div>
+              <% } else { %>
+              
+                <img src="<%= post.imagen_url %>" alt="Post LinkedIn" class="linkedin-img-full" onerror="this.src='/img/fondo-home.png'">
+              <% } %>
+
+            </a>
+          </div>
+        <% }); %>
+      <% } else { %>
+        <div class="linkedin-slide active">
+         
+          <div class="linkedin-empty">Actualizando comunicaciones...</div>
+        </div>
+   
+      <% } %>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<% if (typeof isAdministrador !== 'undefined' && isAdministrador) { %>
+<div id="modalPlatos" class="modal-overlay">
+  <div class="modal-content2 modal-content2-large">
+    <h3>Editar Menú Semanal</h3>
+    
+    <form action="/platos/editar" method="POST">
+      <% const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']; %>
+      <% for(let i = 1; i <= 5; i++) { %>
+        <% const platoDia = (typeof menuSemanal !== 'undefined' && menuSemanal) ? menuSemanal.find(p => p.dia_numero === i) : null; %>
+        <div class="modal-form-group">
+          <label class="modal-form-label"><%= dias[i-1] %></label>
+          <input type="text" name="plato_<%= i %>" value="<%= platoDia ? platoDia.nombre_plato : '' %>" required class="modal-form-input">
+        </div>
+      <% } %>
+      
+      <div class="modal-actions-row">
+        <button type="button" onclick="IntranetModal.close('modalPlatos')" class="modal-button-secondary">Cancelar</button>
+        <button type="submit" class="modal-button-primary">Guardar Menú</button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<div id="modalVerMenu" class="modal-overlay">
+  <div class="modal-content2">
+    <button onclick="IntranetModal.close('modalVerMenu')" class="modal-content2-close">&times;</button>
+    <h3>Menú de la Semana</h3>
+    
+    <div class="modal-list-stack">
+      <% const nombresDiasMenu = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']; %>
+      <% for(let i = 1; i <= 5; i++) { %>
+        <% const pDia = (typeof menuSemanal !== 'undefined' && menuSemanal) ? menuSemanal.find(p => p.dia_numero === i) : null; %>
+        <div class="modal-list-item">
+          <span class="modal-item-label"><%= nombresDiasMenu[i-1] %></span>
+          <span class="modal-item-value"><%= pDia && pDia.nombre_plato ? pDia.nombre_plato : 'No definido' %></span>
+        </div>
+      <% } %>
+    </div>
+    
+    <div class="modal-footer-center">
+      <button onclick="IntranetModal.close('modalVerMenu')" class="modal-button-primary modal-button-primary-sm">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleCumpleanios() {
+    const items = document.querySelectorAll('.item-cumple');
+    const btn = document.getElementById('btn-ver-mas-cumple');
+    
+    const hayOcultos = Array.from(items)
+      .slice(3)
+      .some(el => el.classList.contains('is-hidden'));
+
+    if (hayOcultos) {
+      items.forEach(el => el.classList.remove('is-hidden'));
+      btn.innerText = 'Ver menos...';
+    } else {
+      items.forEach((el, index) => {
+        if (index >= 3) el.classList.add('is-hidden');
+      });
+      btn.innerText = 'Ver más...';
+    }
+  }
+
+  let linkedinIndex = 0;
+  function moveLinkedin(n) {
+    const slides = document.querySelectorAll('.linkedin-slide');
+    if (slides.length <= 1) return; 
+
+    slides[linkedinIndex].classList.remove('active');
+    linkedinIndex += n;
+    if (linkedinIndex >= slides.length) linkedinIndex = 0;
+    if (linkedinIndex < 0) linkedinIndex = slides.length - 1;
+    slides[linkedinIndex].classList.add('active');
+  }
+
+  // Script para el modal de Platos y el de Ver Menú
+  window.addEventListener('click', function(event) {
+    if (event.target.id === 'modalPlatos') {
+      IntranetModal.close('modalPlatos');
+    }
+    if (event.target.id === 'modalVerMenu') {
+      IntranetModal.close('modalVerMenu');
+    }
+  });
+</script>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <style>
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .header-top h2 {
+      margin: 0;
+      color: #003a70;
+      font-size: 1.8rem;
+    }
+
+    .btn-volver {
+      text-decoration: none;
+      color: #666;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.2s;
+      font-size: 0.9rem;
+    }
+    .btn-volver:hover {
+      color: #003a70;
+    }
+
+    .organigrama-link {
+      display: block;
+      cursor: zoom-in;
+      text-decoration: none;
+    }
+
+    .organigrama-full {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .upload-section {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 12px;
+      border: 1px dashed #cbd5e1;
+      text-align: center;
+    }
+
+    .upload-section h3 {
+      color: #003a70;
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
+
+    .btn-custom-upload {
+      background-color: #ffffff;
+      color: #003a70;
+      border: 2px dashed #003a70;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+      display: inline-block;
+    }
+
+    .btn-custom-upload:hover {
+      background-color: #f1f5f9;
+    }
+
+    .nombre-archivo-seleccionado {
+      display: block;
+      margin-top: 10px;
+      font-size: 0.9rem;
+      color: #16a34a;
+      font-weight: bold;
+    }
+
+    .btn-confirmar {
+      background-color: #82D200;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 15px;
+      display: none;
+    }
+
+    .btn-confirmar:hover {
+      background-color: #72b800;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-top">
+    <h2>Organigrama</h2>
+    <a href="/RRHH" class="btn-volver">← Volver a RRHH</a>
+  </div>
+
+  <% if (organigramaUrl) { %>
+    <a href="<%= organigramaUrl %>" target="_blank" class="organigrama-link" title="Haz clic para ver en tamaño completo">
+      <img src="<%= organigramaUrl %>" alt="Organigrama Transworld" class="organigrama-full">
+    </a>
+  <% } else { %>
+    <div style="text-align: center; padding: 50px; background: #f8fafc; border-radius: 12px; color: #64748b;">
+      <span style="font-size: 3rem; display: block; margin-bottom: 10px;">📊</span>
+      Aún no se ha subido un organigrama.
+    </div>
+  <% } %>
+
+  <% if (typeof isAdministrador !== 'undefined' && isAdministrador) { %>
+    <div class="upload-section">
+      <h3>Actualizar Organigrama</h3>
+      
+      <form action="/RRHH/organigrama/subir" method="POST" enctype="multipart/form-data" style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+        
+        <div class="file-input-wrapper">
+          <label for="input-organigrama" class="btn-custom-upload">
+            Seleccionar archivo
+          </label>
+          <input 
+            id="input-organigrama" 
+            type="file" 
+            name="organigrama" 
+            accept="image/*,application/pdf" 
+            required 
+            style="display: none;"
+            onchange="mostrarNombreArchivo(this)"
+          >
+          <span id="nombre-archivo" class="nombre-archivo-seleccionado" style="display: none;"></span>
+        </div>
+
+        <button type="submit" id="btn-submit" class="btn-confirmar">
+          Confirmar cambio
+        </button>
+      </form>
+      
+      <p style="margin: 10px 0 0 0; color:#888; font-size: 0.8rem;">
+        Al confirmar, el organigrama actual será reemplazado inmediatamente.
+      </p>
+    </div>
+  <% } %>
+
+  <script>
+    function mostrarNombreArchivo(input) {
+      const span = document.getElementById('nombre-archivo');
+      const btnSubmit = document.getElementById('btn-submit');
+
+      if (input.files && input.files.length > 0) {
+        span.textContent = input.files[0].name;
+        span.style.display = 'block';
+        btnSubmit.style.display = 'inline-block';
+      } else {
+        span.style.display = 'none';
+        btnSubmit.style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,447 @@
+<style>
+  .dashboard-container {
+    padding: 20px;
+    background-color: transparent;
+  }
+
+  .main-kpi-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr; 
+    gap: 30px;
+    margin-bottom: 50px;
+    align-items: start; 
+  }
+
+  .kpi-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 20px rgba(0, 58, 112, 0.08);
+    border: 1px solid #eef3f9;
+  }
+
+  .kpi-card h2 {
+    color: #003a70;
+    margin-top: 0;
+    margin-bottom: 25px;
+    font-size: 1.5rem;
+    font-weight: 800;
+    border-bottom: 2px solid #f0f4f8;
+    padding-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .chart-container {
+    position: relative;
+    height: 350px;
+    width: 100%;
+    transition: height 0.3s ease; 
+  }
+
+  .ranking-table-wrapper {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+  }
+
+  .ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+
+  .ranking-table th {
+    background-color: #003a70;
+    color: white;
+    padding: 15px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    font-weight: 600;
+  }
+
+  .ranking-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    color: #444;
+    vertical-align: middle;
+  }
+
+  .name-cell {
+    font-weight: 600;
+    font-size: clamp(1rem, 1.2vw + 0.4rem, 1.25rem);
+    line-height: 1.3;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .ranking-table tbody tr:hover {
+    background-color: #f8fbff;
+  }
+
+  .rank-badge {
+    background: #ff4500;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    display: inline-block;
+    min-width: 25px;
+    text-align: center;
+  }
+  
+  .btn-toggle-chart {
+    background: none;
+    border: none;
+    color: #003a70;
+    font-weight: bold;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 0.95rem;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+  
+  .btn-toggle-chart:hover {
+    background: rgba(0, 58, 112, 0.1);
+  }
+
+  .cursos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: 30px;
+  }
+
+  .section-title {
+    color: #003a70;
+    font-size: 1.8rem;
+    font-weight: 900;
+    margin-top: 40px;
+    margin-bottom: 30px;
+    border-left: 5px solid #ff4500;
+    padding-left: 15px;
+  }
+
+  @media (max-width: 900px) {
+    .main-kpi-row {
+        display: grid;
+        grid-template-columns: 1fr; 
+        margin-bottom: 50px;
+    }
+    .cursos-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+<div class="dashboard-container">
+
+  <div class="main-kpi-row">
+    
+    <div class="columna-izquierda" style="min-width: 0;">
+      <div class="kpi-card" style="height: 100%; box-sizing: border-box;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+          <h2 style="margin-bottom: 0; border: none; padding: 0; font-size: 1.5rem; color: #003a70;">Ranking: Cursos Realizados</h2>
+          <button id="btnToggleChart" class="btn-toggle-chart" onclick="toggleRankingChart()">Ver más...</button>
+        </div>
+        <div id="mainChartContainer" class="chart-container" style="position: relative; width: 100%; max-width: 100%;">
+          <canvas id="chartGeneral"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="columna-derecha" style="display: flex; flex-direction: column; min-width: 0; border-left: 5px solid #ff4500; padding-left: 30px;">
+      
+      <div style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+        
+        <div class="kpi-card" style="width: 100%; margin: 0; box-sizing: border-box; padding: 20px;">
+          
+          <h2 style="margin-top: 0; margin-bottom: 20px; font-size: 1.5rem; color: #003a70; padding-bottom: 15px; border-bottom: 2px solid #f0f4f8;">
+            Rendimiento por Curso
+          </h2>
+
+          <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+            
+            <div style="flex: 1; min-width: 120px;">
+              <label style="font-weight: bold; color: #003a70; display: block; margin-bottom: 8px; font-size: 0.9rem;">1. Área</label>
+              <select id="selectSeccion" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem;">
+                <option value="">-- Área --</option>
+              </select>
+            </div>
+
+            <div style="flex: 1; min-width: 120px;">
+              <label style="font-weight: bold; color: #003a70; display: block; margin-bottom: 8px; font-size: 0.9rem;">2. Subárea</label>
+              <select id="selectSubseccion" disabled style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem;">
+                <option value="">-- Subárea --</option>
+              </select>
+            </div>
+
+            <div style="flex: 1.5; min-width: 180px;">
+              <label style="font-weight: bold; color: #003a70; display: block; margin-bottom: 8px; font-size: 0.9rem;">3. Curso</label>
+              <select id="selectCurso" disabled style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem;">
+                <option value="">-- Curso --</option>
+              </select>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="kpi-card" id="cursoChartWrapper" style="display: none; width: 100%; margin: 0; box-sizing: border-box;">
+          <h2 id="tituloCursoSeleccionado" style="font-size: 1.1rem; margin-bottom: 15px; color: #003a70; border-bottom: 2px solid #f0f4f8; padding-bottom: 10px;">
+            Seleccione un curso
+          </h2>
+          <div class="chart-container" style="position: relative; height: 350px; width: 100%; max-width: 100%;">
+            <canvas id="chartCursoUnico"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const chartColors = {
+    blue: 'rgba(0, 58, 112, 0.8)',
+    blueBorder: 'rgba(0, 58, 112, 1)',
+    orange: 'rgba(255, 69, 0, 0.8)',
+    orangeBorder: 'rgba(255, 69, 0, 1)',
+    green: 'rgba(40, 167, 69, 0.8)',
+    greenBorder: 'rgba(40, 167, 69, 1)'
+  };
+
+  function formatMedalName(name, index) {
+    if (index === 0) return '🥇 ' + name;
+    if (index === 1) return '🥈 ' + name;
+    if (index === 2) return '🥉 ' + name;
+    return (index + 1) + '. ' + name;
+  }
+
+  // --- 1. GRÁFICO GENERAL (DINÁMICO TOP 10 / TODOS) ---
+  const top10Data = <%- JSON.stringify(typeof top10Ranking !== 'undefined' ? top10Ranking : []) %>;
+  const allRankingData = <%- JSON.stringify(typeof todosLosRanking !== 'undefined' ? todosLosRanking : []) %>;
+  
+  let chartGeneralInstance = null;
+  let isShowingAll = false;
+
+  if (top10Data.length > 0) {
+    const ctxGeneral = document.getElementById('chartGeneral').getContext('2d');
+    Chart.register(ChartDataLabels);
+
+    chartGeneralInstance = new Chart(ctxGeneral, {
+      type: 'bar',
+      data: {
+        labels: top10Data.map((u, i) => formatMedalName(u.nombre_usuario, i)),
+        datasets: [{
+          label: 'Puntaje Total',
+          data: top10Data.map(u => parseInt(u.puntaje_total)),
+          backgroundColor: chartColors.blue,
+          borderColor: chartColors.blueBorder,
+          borderWidth: 2,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y', 
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) { 
+                return 'Puntaje total: ' + context.parsed.x + ' pts'; 
+              }
+            }
+          },
+          datalabels: {
+            color: '#ffffff', 
+            anchor: 'end',    
+            align: 'start',   
+            offset: 10, 
+            font: {
+              weight: 'bold',
+              size: 13
+            },
+            formatter: function(value, context) {
+              const datasetToUse = isShowingAll ? allRankingData : top10Data;
+              const cantidadCursos = datasetToUse[context.dataIndex].cursos_completados;
+              const textoCurso = cantidadCursos == 1 ? 'curso' : 'cursos';
+              if (value === 0) return '';
+              return `${cantidadCursos} ${textoCurso}`;
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            ticks: { stepSize: 10 },
+            grid: { color: '#f0f0f0' },
+            grace: '5%' 
+          },
+          y: {
+            grid: { display: false },
+            ticks: { font: { size: 26, weight: 'bold' } }
+          }
+        }
+      }
+    });
+  }
+
+  function toggleRankingChart() {
+    if (!chartGeneralInstance) return;
+    
+    isShowingAll = !isShowingAll;
+    const dataToUse = isShowingAll ? allRankingData : top10Data;
+    const container = document.getElementById('mainChartContainer');
+    const btn = document.getElementById('btnToggleChart');
+
+    if (isShowingAll) {
+      const newHeight = Math.max(350, dataToUse.length * 35 + 50);
+      container.style.height = newHeight + 'px';
+      btn.innerText = 'Ver menos...';
+    } else {
+      container.style.height = '350px';
+      btn.innerText = 'Ver más...';
+    }
+
+    chartGeneralInstance.data.labels = dataToUse.map((u, i) => formatMedalName(u.nombre_usuario, i));
+    chartGeneralInstance.data.datasets[0].data = dataToUse.map(u => parseInt(u.puntaje_total)); 
+    chartGeneralInstance.update();
+  }
+
+  // --- 2. GRÁFICOS POR CURSO (FILTRO EN CASCADA) ---
+  const cursosKpiData = <%- JSON.stringify(kpiPorCurso || []) %>;
+  let chartCursoInstance = null;
+
+  const selectSeccion = document.getElementById('selectSeccion');
+  const selectSubseccion = document.getElementById('selectSubseccion');
+  const selectCurso = document.getElementById('selectCurso');
+  const chartWrapper = document.getElementById('cursoChartWrapper');
+  const tituloCursoSeleccionado = document.getElementById('tituloCursoSeleccionado');
+
+  const seccionesUnicas = [...new Set(cursosKpiData.map(c => c.seccion).filter(Boolean))];
+  
+  seccionesUnicas.forEach(sec => {
+    selectSeccion.add(new Option(sec, sec));
+  });
+
+  selectSeccion.addEventListener('change', (e) => {
+    const sec = e.target.value;
+    
+    selectSubseccion.innerHTML = '<option value="">-- Seleccione Subárea --</option>';
+    selectCurso.innerHTML = '<option value="">-- Seleccione Curso --</option>';
+    chartWrapper.style.display = 'none';
+    selectCurso.disabled = true;
+
+    if (!sec) {
+      selectSubseccion.disabled = true;
+      return;
+    }
+
+    const dataFiltrada = cursosKpiData.filter(c => c.seccion === sec);
+    const subseccionesUnicas = [...new Set(dataFiltrada.map(c => c.subseccion).filter(Boolean))];
+
+    if (subseccionesUnicas.length > 0) {
+      subseccionesUnicas.forEach(subsec => {
+        selectSubseccion.add(new Option(subsec, subsec));
+      });
+      selectSubseccion.disabled = false;
+    } else {
+      selectSubseccion.innerHTML = '<option value="">No aplica</option>';
+      selectSubseccion.disabled = true;
+      cargarCursos(dataFiltrada);
+    }
+  });
+
+  selectSubseccion.addEventListener('change', (e) => {
+    const subsec = e.target.value;
+    const sec = selectSeccion.value;
+    
+    selectCurso.innerHTML = '<option value="">-- Seleccione Curso --</option>';
+    chartWrapper.style.display = 'none';
+
+    if (!subsec) {
+      selectCurso.disabled = true;
+      return;
+    }
+
+    const dataFiltrada = cursosKpiData.filter(c => c.seccion === sec && c.subseccion === subsec);
+    cargarCursos(dataFiltrada);
+  });
+
+  function cargarCursos(data) {
+    selectCurso.innerHTML = '<option value="">-- Seleccione Curso --</option>';
+    data.forEach(c => {
+      selectCurso.add(new Option(c.curso_titulo, c.curso_titulo));
+    });
+    selectCurso.disabled = false;
+  }
+
+  selectCurso.addEventListener('change', (e) => {
+    const tituloCurso = e.target.value;
+    
+    if (!tituloCurso) {
+      chartWrapper.style.display = 'none';
+      return;
+    }
+
+    const cursoSeleccionado = cursosKpiData.find(c => c.curso_titulo === tituloCurso);
+    if (cursoSeleccionado) {
+      renderizarGraficoCurso(cursoSeleccionado);
+      tituloCursoSeleccionado.innerText = cursoSeleccionado.curso_titulo;
+      chartWrapper.style.display = 'block';
+    }
+  });
+
+  function renderizarGraficoCurso(cursoInfo) {
+    const ctx = document.getElementById('chartCursoUnico').getContext('2d');
+    
+    if (chartCursoInstance) {
+      chartCursoInstance.destroy();
+    }
+
+    chartCursoInstance = new Chart(ctx, {
+      type: 'bar', 
+      data: {
+        labels: cursoInfo.top10.map(u => u.nombre_usuario),
+        datasets: [{
+          label: 'Nota',
+          data: cursoInfo.top10.map(u => parseFloat(u.nota)),
+          backgroundColor: chartColors.green,
+          borderColor: chartColors.greenBorder,
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: { display: false } 
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            max: 100, 
+            grid: { color: '#f0f0f0' }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { font: { size: 12 } }
+          }
+        }
+      }
+    });
+  }
+</script>

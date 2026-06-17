@@ -1,0 +1,308 @@
+<style>
+  /* --- CONTENEDOR SUPERIOR --- */
+  .cabecera-tickets {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 15px;
+  }
+
+  /* --- ESTILOS DE LA TABLA --- */
+  .tabla-tickets { 
+      width: 100%; 
+      border-collapse: collapse; 
+      background: white; 
+      border-radius: 8px; 
+      overflow: hidden; 
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+  }
+  .tabla-tickets th, .tabla-tickets td { 
+      padding: 15px; 
+      text-align: left; 
+      border-bottom: 1px solid #eee; 
+  }
+  .tabla-tickets thead { 
+      background-color: #003a70; 
+      color: white; 
+  }
+  
+  /* Filas Clickeables */
+  .tabla-tickets tbody tr {
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+  }
+  .tabla-tickets tbody tr:hover {
+    background-color: #eef4fb; 
+  }
+
+  /* Encabezados Ordenables */
+  .tabla-tickets th {
+    cursor: pointer;
+    user-select: none; 
+    position: relative;
+    padding-right: 20px; 
+  }
+  .tabla-tickets th:hover {
+    background-color: #002a52;
+  }
+
+  /* Flechas de ordenamiento */
+  .sort-icon {
+    font-size: 0.8em;
+    margin-left: 5px;
+    opacity: 0.5;
+  }
+  .th-sort-asc .sort-icon::after { content: "▲"; opacity: 1; }
+  .th-sort-desc .sort-icon::after { content: "▼"; opacity: 1; }
+
+  /* --- SISTEMA DE NOTIFICACIONES (NO LEÍDOS) --- */
+  .fila-no-leida {
+    background-color: #fffdf5 !important;
+    border-left: 4px solid #ff9500 !important;
+  }
+  .fila-no-leida td {
+    font-weight: 700 !important;
+  }
+  .badge-nuevo-ticket {
+    background-color: #ff3b30;
+    color: white;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 12px;
+    margin-left: 8px;
+    vertical-align: middle;
+    text-transform: uppercase;
+  }
+  
+  /* --- BADGES DE ESTADO Y PRIORIDAD --- */
+  .badge { padding: 5px 10px; border-radius: 20px; font-size: 0.85em; font-weight: bold; }
+  .bg-success { background-color: #28a745; color: white; }
+  .bg-warning { background-color: #ffc107; color: #333; }
+  .bg-danger { background-color: #dc3545; color: white; }
+  .bg-secondary { background-color: #6c757d; color: white; }
+  .bg-primary { background-color: #007bff; color: white; }
+
+  .btn-primario {
+      background-color: #003a70;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s;
+  }
+  .btn-primario:hover {
+      background-color: #002a52;
+  }
+
+  .btn-toggle-cerrados {
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--color-surface-muted, #f4f6f8);
+    border: 1px solid var(--color-border-strong, #ccc);
+    border-radius: 6px;
+    color: var(--color-text-muted, #555);
+    transition: all 0.2s;
+  }
+  .btn-toggle-cerrados:hover {
+    background: var(--color-surface-elevated, #e8ecf0);
+    border-color: var(--color-border, #bbb);
+  }
+</style>
+
+<div class="cabecera-tickets">
+  <div>
+    <h2 style="color: #003a70; margin: 0; font-size: 2rem;"><%= titulo || 'Ticketera' %></h2>
+    <p style="color: #666; margin: 5px 0 0 0;">Listado de tickets recibidos por soporte.</p>
+  </div>
+  
+  <div style="display: flex; gap: 15px; align-items: center;">
+    <% if (typeof isAdministrador !== 'undefined' && isAdministrador) { %>
+    <button id="btnToggleCerrados" type="button" class="btn-toggle-cerrados" onclick="toggleCerrados()">
+      <span id="eyeIcon" style="display: flex; align-items: center;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/><path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .707-.707 12 12-.708.707z"/></svg>
+      </span>
+      <span id="eyeText">Mostrar Cerrados</span>
+    </button>
+    <% } %>
+
+    <a href="/sistemas/tickets/nuevo" class="btn-primario" style="padding: 10px 20px; display: flex; align-items: center; gap: 8px; font-weight: 600; text-decoration: none;">
+      <span style="font-size: 1.2rem; line-height: 1;">+</span> Abrir Nuevo Ticket
+    </a>
+  </div>
+</div>
+
+<table class="tabla-tickets" id="ticketsTable">
+  <thead>
+    <tr>
+      <% let cIdx = 0; %>
+      <th onclick="sortTable(<%= cIdx++ %>)">ID <span class="sort-icon"></span></th>
+      <th onclick="sortTable(<%= cIdx++ %>)">Título <span class="sort-icon"></span></th>
+      <th onclick="sortTable(<%= cIdx++ %>)">Categoría <span class="sort-icon"></span></th>
+      <th onclick="sortTable(<%= cIdx++ %>)">Importancia <span class="sort-icon"></span></th>
+      <th onclick="sortTable(<%= cIdx++ %>)">Estado <span class="sort-icon"></span></th>
+      <% if (user && typeof isAdministrador !== 'undefined' && isAdministrador) { %>
+        <th onclick="sortTable(<%= cIdx++ %>)">Tomado por <span class="sort-icon"></span></th>
+      <% } %>
+      <th onclick="sortTable(<%= cIdx++ %>)">Solicitante <span class="sort-icon"></span></th>
+      <th onclick="sortTable(<%= cIdx++ %>)">Correo <span class="sort-icon"></span></th>
+      <th onclick="sortTable(<%= cIdx++ %>)">Creado <span class="sort-icon"></span></th>
+      <th onclick="sortTable(<%= cIdx++ %>)">Últ. Respuesta <span class="sort-icon"></span></th>
+      <th onclick="sortTable(<%= cIdx++ %>)">T. Respuesta <span class="sort-icon"></span></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (tickets && tickets.length > 0) { %>
+      <% tickets.forEach(t => { 
+         
+         let esNoLeido = false;
+         if (typeof user !== 'undefined' && typeof isAdministrador !== 'undefined' && isAdministrador && t.leido_admin === false) {
+            esNoLeido = true;
+         } else if (typeof user !== 'undefined' && !(typeof isAdministrador !== 'undefined' && isAdministrador) && t.leido_usuario === false) {
+            esNoLeido = true;
+         }
+
+         let badgePrioridad = 'bg-secondary';
+         if (t.prioridad === 'Alta') badgePrioridad = 'bg-danger';
+         else if (t.prioridad === 'Media') badgePrioridad = 'bg-success';
+         else if (t.prioridad === 'Baja') badgePrioridad = 'bg-primary';
+
+         let badgeEstado = 'bg-secondary';
+         if (t.estado === 'Abierto') badgeEstado = 'bg-primary';
+         else if (t.estado === 'En curso') badgeEstado = 'bg-warning';
+         else if (t.estado === 'Pendiente de cierre') badgeEstado = 'bg-warning';
+         else if (t.estado === 'Cerrado') badgeEstado = 'bg-success';
+
+         const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: 'numeric', second: 'numeric' };
+         const strCreado = t.fecha_creacion ? new Date(t.fecha_creacion).toLocaleDateString('es-CL', options) : '-';
+         const strUltima = t.fecha_ultima_respuesta ? new Date(t.fecha_ultima_respuesta).toLocaleDateString('es-CL', options) : '-';
+         
+         let tRespuesta = '-';
+         if (t.fecha_ultima_respuesta && t.fecha_creacion) {
+            const diffMs = new Date(t.fecha_ultima_respuesta) - new Date(t.fecha_creacion);
+            const diffMins = Math.floor(diffMs / 60000);
+            if (diffMins < 60) tRespuesta = `${diffMins}m`;
+            else if (diffMins < 1440) tRespuesta = `${Math.floor(diffMins/60)}h ${diffMins%60}m`;
+            else tRespuesta = `${Math.floor(diffMins/1440)}d ${Math.floor((diffMins%1440)/60)}h`;
+         }
+      %>
+        <tr class="clickable-row <%= esNoLeido ? 'fila-no-leida' : '' %>" data-href="/sistemas/tickets/<%= t.id %>" data-estado="<%= t.estado %>">
+          
+          <td data-sort="<%= t.id %>">
+            <%= t.id %>
+            <% if (esNoLeido) { %><span class="badge-nuevo-ticket">Nuevo</span><% } %>
+          </td>
+          <td style="color: #0056b3; font-weight: 500; min-width: 200px; max-width: 300px;" title="<%= t.titulo %>">
+            <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2;">
+              <%= t.titulo %>
+            </div>
+          </td>
+          <td><%= t.categoria || '-' %></td>
+          <td data-sort="<%= t.prioridad %>"><span class="badge <%= badgePrioridad %>"><%= t.prioridad %></span></td>
+          <td data-sort="<%= t.estado %>"><span class="badge <%= badgeEstado %>"><%= t.estado %></span></td>
+          
+          <% if (user && typeof isAdministrador !== 'undefined' && isAdministrador) { %>
+            <td style="font-weight: 600; color: <%= t.asignado_a ? '#28a745' : '#888' %>;">
+                <%= t.asignado_a || 'Sin asignar' %>
+            </td>
+          <% } %>
+
+          <td><%= t.solicitante_nombre %></td>
+          <td style="color: #555; font-size: 0.9em;"><%= t.solicitante_email %></td>
+          <td data-sort="<%= t.fecha_creacion ? new Date(t.fecha_creacion).getTime() : 0 %>" style="color: #555; font-size: 0.85em;"><%= strCreado %></td>
+          <td data-sort="<%= t.fecha_ultima_respuesta ? new Date(t.fecha_ultima_respuesta).getTime() : 0 %>" style="color: #555; font-size: 0.85em;"><%= strUltima %></td>
+          <td style="color: #003a70; font-weight: 600; font-size: 0.9em;"><%= tRespuesta %></td>
+          
+        </tr>
+      <% }) %>
+    <% } else { %>
+      <tr>
+        <td colspan="<%= (user && typeof isAdministrador !== 'undefined' && isAdministrador) ? 11 : 10 %>" style="text-align: center; padding: 30px; color: #777;">No hay tickets registrados actualmente.</td>
+      </tr>
+    <% } %>
+  </tbody>
+</table>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const rows = document.querySelectorAll(".clickable-row");
+    rows.forEach(row => {
+      row.addEventListener("click", () => {
+        window.location.href = row.getAttribute("data-href");
+      });
+    });
+  });
+
+  let sortDirection = {}; 
+  function sortTable(columnIndex) {
+    const table = document.getElementById("ticketsTable");
+    const tbody = table.querySelector("tbody");
+    const rows = Array.from(tbody.querySelectorAll("tr.clickable-row"));
+    const headers = table.querySelectorAll("th");
+
+    if(rows.length === 0) return;
+
+    sortDirection[columnIndex] = !sortDirection[columnIndex];
+    const isAscending = sortDirection[columnIndex];
+    
+    headers.forEach(th => {
+      th.classList.remove("th-sort-asc", "th-sort-desc");
+    });
+    headers[columnIndex].classList.add(isAscending ? "th-sort-asc" : "th-sort-desc");
+    
+    rows.sort((rowA, rowB) => {
+      const cellA = rowA.children[columnIndex];
+      const cellB = rowB.children[columnIndex];
+
+      let valA = cellA.getAttribute("data-sort") || cellA.innerText.trim().toLowerCase();
+      let valB = cellB.getAttribute("data-sort") || cellB.innerText.trim().toLowerCase();
+
+      const numA = parseFloat(valA);
+      const numB = parseFloat(valB);
+
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return isAscending ? numA - numB : numB - numA;
+      }
+
+      if (valA < valB) return isAscending ? -1 : 1;
+      if (valA > valB) return isAscending ? 1 : -1;
+      return 0;
+    });
+    
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  let mostrandoCerrados = true; 
+  function toggleCerrados() {
+    mostrandoCerrados = !mostrandoCerrados;
+    const rows = document.querySelectorAll(".tabla-tickets tbody tr.clickable-row");
+    const btnIcon = document.getElementById("eyeIcon");
+    const btnText = document.getElementById("eyeText");
+    
+    rows.forEach(row => {
+      const estado = row.getAttribute("data-estado");
+      if (estado === "Cerrado") {
+        row.style.display = mostrandoCerrados ? "" : "none";
+      }
+    });
+    
+    if (mostrandoCerrados) {
+      btnIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>`;
+      btnText.innerText = "Ocultar Cerrados";
+    } else {
+      btnIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/><path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .707-.707 12 12-.708.707z"/></svg>`;
+      btnText.innerText = "Mostrar Cerrados";
+    }
+  }
+
+  <% if (typeof isAdministrador !== 'undefined' && isAdministrador) { %>
+  document.addEventListener("DOMContentLoaded", () => {
+    toggleCerrados();
+  });
+  <% } %>
+</script>

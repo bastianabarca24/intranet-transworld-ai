@@ -1,0 +1,183 @@
+<style>
+  .rrhh-header {
+    color: #003a70;
+    margin-bottom: 5px;
+    font-weight: 800;
+    border-bottom: 2px solid #eef3f9;
+    padding-bottom: 10px;
+  }
+  
+  .rrhh-subtitle {
+    color: #64748b;
+    margin-bottom: 15px;
+    font-size: 0.95rem;
+  }
+
+  .rrhh-section-title {
+    color: #003a70;
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 25px 0 15px 0;
+  }
+  
+  .rrhh-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .rrhh-card {
+    background: #003a70;
+    border: 1px solid #002a52;
+    border-radius: 12px;
+    padding: 25px;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 58, 112, 0.15);
+    overflow: hidden;
+  }
+  
+  .rrhh-card:hover {
+    transform: translateY(-5px);
+    background: #004a8f;
+    box-shadow: 0 10px 20px rgba(0, 58, 112, 0.25);
+  }
+
+  .link-type-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+  
+  .badge-interno {
+    background: rgba(255, 255, 255, 0.15);
+    color: #e2e8f0;
+  }
+  
+  .badge-externo {
+    background: #82D200;
+    color: #003a70;
+  }
+
+  .rrhh-icon-container {
+    width: 55px;
+    height: 55px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white; 
+    border-radius: 8px;
+    padding: 5px;
+  }
+
+  .rrhh-icon-container.no-bg {
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  .rrhh-icon-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  
+  .rrhh-emoji {
+    font-size: 1.8rem;
+  }
+  
+  .rrhh-title {
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  
+  .rrhh-desc {
+    color: #cbd5e1; 
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  .external-icon {
+    font-size: 0.8rem;
+    margin-left: 5px;
+  }
+</style>
+
+<h2 class="rrhh-header">Recursos Humanos</h2>
+<p class="rrhh-subtitle">Accede a las herramientas internas y portales externos de gestión.</p>
+
+<h3 class="rrhh-section-title">Plataformas Internas</h3>
+<div class="rrhh-grid">
+  
+  <a href="/RRHH/organigrama" class="rrhh-card">
+    <span class="link-type-badge badge-interno">Interno</span>
+    <div class="rrhh-icon-container no-bg">
+      <span class="rrhh-emoji">🏢</span>
+    </div>
+    <div class="rrhh-text">
+      <span class="rrhh-title">Organigrama</span>
+      <span class="rrhh-desc">Estructura general y departamentos.</span>
+    </div>
+  </a>
+
+  <a href="/RRHH/personal" class="rrhh-card">
+    <span class="link-type-badge badge-interno">Interno</span>
+    <div class="rrhh-icon-container no-bg">
+      <span class="rrhh-emoji">👥</span>
+    </div>
+    <div class="rrhh-text">
+      <span class="rrhh-title">Personal</span>
+      <span class="rrhh-desc">Directorio de contacto de colaboradores.</span>
+    </div>
+  </a>
+
+</div>
+
+<h3 class="rrhh-section-title">Portales Externos</h3>
+<div class="rrhh-grid">
+
+  <a href="https://transworld.rexmas.com/" target="_blank" class="rrhh-card">
+    <span class="link-type-badge badge-externo">Externo <span class="external-icon">↗</span></span>
+    <div class="rrhh-icon-container">
+      <img src="/img/logo_rex.png" alt="Rex+">
+    </div>
+    <div class="rrhh-text">
+      <span class="rrhh-title">Rex+</span>
+      <span class="rrhh-desc">Portal del colaborador y liquidaciones.</span>
+    </div>
+  </a>
+
+  <a href="https://www.achs.cl/" target="_blank" class="rrhh-card">
+    <span class="link-type-badge badge-externo">Externo <span class="external-icon">↗</span></span>
+    <div class="rrhh-icon-container no-bg">
+      <img src="/img/achs.png" alt="ACHS">
+    </div>
+    <div class="rrhh-text">
+      <span class="rrhh-title">ACHS</span>
+      <span class="rrhh-desc">Seguridad y salud ocupacional.</span>
+    </div>
+  </a>
+
+  <a href="https://www.cajalosandes.cl/" target="_blank" class="rrhh-card">
+    <span class="link-type-badge badge-externo">Externo <span class="external-icon">↗</span></span>
+    <div class="rrhh-icon-container no-bg">
+      <img src="/img/cajalosandes.png" alt="Caja Los Andes">
+    </div>
+    <div class="rrhh-text">
+      <span class="rrhh-title">Caja Los Andes</span>
+      <span class="rrhh-desc">Beneficios, convenios y ahorros.</span>
+    </div>
+  </a>
+
+</div>

@@ -1,0 +1,293 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+
+  /* CONTENEDOR PRINCIPAL */
+  .detalle-contenedor {
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 0 20px;
+    font-family: 'Montserrat', sans-serif;
+  }
+
+  /* BOTÓN VOLVER */
+  .link-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #003a70;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 25px;
+    transition: transform 0.2s ease;
+  }
+  .link-volver:hover {
+    transform: translateX(-5px);
+    color: #002a52;
+  }
+
+  /* TARJETA DE LA NOTICIA */
+  .noticia-card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+  }
+
+  /* PORTADA */
+  .noticia-portada-link {
+    display: block;
+    width: 100%;
+    height: 420px;
+    overflow: hidden;
+    background-color: #f1f5f9;
+  }
+  .noticia-portada-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+  }
+  .noticia-portada-link:hover .noticia-portada-img {
+    transform: scale(1.03);
+  }
+
+  /* CONTENIDO INTERIOR */
+  .noticia-body {
+    padding: 40px;
+  }
+
+  .noticia-titulo {
+    color: #003a70;
+    font-size: 2.4rem;
+    font-weight: 800;
+    margin: 0 0 12px 0;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+  }
+
+  .noticia-subtitulo {
+    color: #475569;
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin: 0 0 20px 0;
+    line-height: 1.5;
+  }
+
+  .noticia-fecha {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 35px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .noticia-contenido {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: #334155;
+    white-space: pre-wrap;
+  }
+
+  /* MULTIMEDIA */
+  .titulo-seccion {
+    color: #003a70;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 40px 0 20px 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  .grid-imagenes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 15px;
+  }
+
+  .media-item {
+    display: block;
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+    aspect-ratio: 4 / 3;
+    background: #f8fafc;
+  }
+  .media-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    border: 1px solid #003a70;
+  }
+  .media-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .grid-videos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  .media-video {
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    background: #000;
+    aspect-ratio: 16 / 9;
+    outline: none;
+  }
+
+  /* BOTÓN ELIMINAR */
+  .btn-eliminar {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-eliminar:hover {
+    background-color: #dc2626;
+  }
+  
+  /* BOTONES DE ADMINISTRACIÓN */
+  .admin-actions {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-top: 25px;
+  }
+  
+  .btn-editar {
+    background-color: #f59e0b;
+    color: white;
+    text-decoration: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.95rem;
+    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-editar:hover {
+    background-color: #d97706;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .noticia-body {
+      padding: 25px;
+    }
+    .noticia-portada-link {
+      height: 250px;
+    }
+    .noticia-titulo {
+      font-size: 1.9rem;
+    }
+  }
+</style>
+
+<div class="detalle-contenedor">
+  <a href="/noticias" class="link-volver">← Volver a Noticias</a>
+
+  <article class="noticia-card">
+    
+    <% if (noticia.imagen) { %>
+      <a href="<%= noticia.imagen %>" target="_blank" class="noticia-portada-link" title="Ver portada completa">
+        <img src="<%= noticia.imagen %>" class="noticia-portada-img" alt="Portada de la noticia">
+      </a>
+    <% } %>
+    
+    <div class="noticia-body">
+      
+      <h1 class="noticia-titulo"><%= noticia.titulo %></h1>
+      
+      <% if (noticia.subtitulo) { %>
+        <h3 class="noticia-subtitulo"><%= noticia.subtitulo %></h3>
+      <% } %>
+      
+      <div class="noticia-fecha">
+        Publicado el <%= new Date(noticia.fecha_creacion).toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %>
+      </div>
+
+      <div class="noticia-contenido"><%- noticia.contenido %></div>
+
+      <% 
+         let adjuntos = [];
+         try {
+           if (typeof noticia.adjuntos === 'string') {
+               adjuntos = JSON.parse(noticia.adjuntos);
+           } else if (noticia.adjuntos) {
+               adjuntos = noticia.adjuntos;
+           }
+         } catch(e) { 
+             console.error("Error cargando adjuntos:", e); 
+         }
+
+         const imagenes = adjuntos.filter(a => a.tipo === 'image' || (a.resource_type === 'image' && a.tipo !== 'video'));
+         const videos = adjuntos.filter(a => a.tipo === 'video' || a.resource_type === 'video');
+      %>
+
+      <% if (imagenes.length > 0 || videos.length > 0) { %>
+        
+        <% if (imagenes.length > 0) { %>
+          <div class="titulo-seccion">Galería de Imágenes</div>
+          <div class="grid-imagenes">
+            <% imagenes.forEach(img => { %>
+              <a href="<%= img.url %>" target="_blank" class="media-item" title="Ver imagen completa">
+                <img src="<%= img.url %>" alt="<%= img.nombre %>">
+              </a>
+            <% }) %>
+          </div>
+        <% } %>
+
+        <% if (videos.length > 0) { %>
+          <div class="titulo-seccion">Videos adjuntos</div>
+          <div class="grid-videos">
+            <% videos.forEach(vid => { %>
+              <video class="media-video" src="<%= vid.url %>" controls title="<%= vid.nombre %>"></video>
+            <% }) %>
+          </div>
+        <% } %>
+
+      <% } %>
+
+      <% if (typeof can !== 'undefined' && can.noticias_write) { %>
+        <hr style="margin: 45px 0 25px 0; border: 0; border-top: 1px solid #e2e8f0;">
+        
+        <div class="admin-actions">
+          <a href="/noticias/editar/<%= noticia.id %>" class="btn-editar">
+            Editar Noticia
+          </a>
+
+          <% if (typeof can !== 'undefined' && can.noticias_write) { %>
+            <form action="/noticias/eliminar/<%= noticia.id %>" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta noticia de forma permanente?');" style="margin: 0;">
+              <button type="submit" class="btn-eliminar">
+                Eliminar Noticia
+              </button>
+            </form>
+          <% } %>
+        </div>
+      <% } %>
+
+    </div>
+  </article>
+</div>

@@ -1,0 +1,204 @@
+<%
+  const tieneFoto = Boolean(usuario.foto);
+  const sinDato = '—';
+  const fechaNacFmt = usuario.fecha_nacimiento
+    ? new Date(usuario.fecha_nacimiento).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
+    : sinDato;
+  const rolFmt = usuario.role || 'Usuario';
+  const correoVerificado = usuario.email_confirmed ? 'Verificado' : 'Pendiente de verificación';
+%>
+<link rel="stylesheet" href="/css/horizontal-forms.css">
+<link rel="stylesheet" href="/css/profile-photo-crop.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+<div class="contenedor-formulario perfil-container">
+
+  <a href="/" class="link-volver">← Volver al inicio</a>
+
+  <div class="form-card layout-horizontal-form">
+    <aside class="form-aside">
+      <h2 class="perfil-title">Mi Perfil</h2>
+      <p class="form-aside-desc">Administra tu foto y revisa todos tus datos de cuenta.</p>
+      <div class="profile-photo-upload">
+        <label for="foto">Foto de perfil</label>
+        <div class="profile-photo-preview-wrap">
+          <div class="profile-photo-preview profile-photo-preview--light" id="photo-preview">
+            <img id="photo-preview-img" <% if (tieneFoto) { %>src="<%= usuario.foto %>"<% } else { %>hidden<% } %>>
+            <div class="profile-photo-placeholder" id="photo-placeholder" <%= tieneFoto ? 'hidden' : '' %>>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </div>
+          </div>
+          <div class="profile-photo-actions">
+            <button type="button" class="btn-photo-select btn-photo-select--light" id="btn-select-photo">
+              <%= tieneFoto ? 'Cambiar foto' : 'Seleccionar foto' %>
+            </button>
+            <button type="button" class="btn-photo-remove" id="btn-remove-photo" <%= tieneFoto ? '' : 'hidden' %>>Quitar foto</button>
+            <span class="profile-photo-hint profile-photo-hint--light">Recorta la imagen en formato circular · JPG, PNG o WebP · Máx. 5 MB</span>
+          </div>
+        </div>
+        <input type="file" id="foto" name="foto" accept="image/*" hidden>
+      </div>
+    </aside>
+
+    <main class="form-main">
+      <h1 class="perfil-nombre">
+        <%= usuario.first_name %> <%= usuario.last_name %>
+      </h1>
+
+      <span class="perfil-rol"><%= rolFmt.toUpperCase() %></span>
+
+      <div class="perfil-datos">
+        <div class="form-grid-2">
+          <div class="info-item">
+            <label>Nombre</label>
+            <span><%= usuario.first_name || sinDato %></span>
+          </div>
+          <div class="info-item">
+            <label>Apellido</label>
+            <span><%= usuario.last_name || sinDato %></span>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="info-item">
+            <label>Correo electrónico</label>
+            <span><%= usuario.email || sinDato %></span>
+          </div>
+          <div class="info-item">
+            <label>Teléfono</label>
+            <% if (usuario.telefono) { %>
+              <% if (usuario.telefonoHref) { %>
+                <span><a href="<%= usuario.telefonoHref %>"><%= usuario.telefono %></a></span>
+              <% } else { %>
+                <span><%= usuario.telefono %></span>
+              <% } %>
+            <% } else { %>
+              <span><%= sinDato %></span>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="info-item">
+            <label>Área de trabajo</label>
+            <span><%= usuario.area || sinDato %></span>
+          </div>
+          <div class="info-item">
+            <label>Fecha de nacimiento</label>
+            <span><%= fechaNacFmt %></span>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="info-item">
+            <label>Rol en intranet</label>
+            <span><%= rolFmt %></span>
+          </div>
+          <div class="info-item">
+            <label>Estado del correo</label>
+            <span><%= correoVerificado %></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="perfil-acciones">
+        <a href="/change-password" class="link-cambiar-pass">Cambiar contraseña</a>
+        <a href="/perfil/cursos" class="btn-ver-cursos">🎓 Mis cursos</a>
+      </div>
+
+      <a href="/logout" class="btn-logout-card">
+        Cerrar Sesión
+      </a>
+    </main>
+  </div>
+</div>
+
+<div class="foto-crop-overlay" id="fotoCropOverlay" role="dialog" aria-modal="true" aria-labelledby="fotoCropTitle" hidden>
+  <div class="foto-crop-modal">
+    <div class="foto-crop-header">
+      <h3 id="fotoCropTitle">Recortar foto de perfil</h3>
+      <button type="button" class="foto-crop-close" id="fotoCropClose" aria-label="Cerrar">&times;</button>
+    </div>
+    <p class="foto-crop-hint">Arrastra y ajusta el encuadre. La foto se verá circular en el perfil.</p>
+    <div class="foto-crop-body">
+      <div class="foto-crop-stage">
+        <img id="fotoCropImage" src="" alt="Vista previa para recortar">
+      </div>
+    </div>
+    <p id="fotoCropError" class="foto-crop-error" role="alert"></p>
+    <div class="foto-crop-footer">
+      <button type="button" class="btn-crop-cancel" id="fotoCropCancel">Cancelar</button>
+      <button type="button" class="btn-crop-save" id="fotoCropSave">Aplicar recorte</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="/js/profile-photo-cropper.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const btnRemove = document.getElementById('btn-remove-photo');
+
+    ProfilePhotoCropper.init({
+      fileInputId: 'foto',
+      previewImgId: 'photo-preview-img',
+      previewPlaceholderId: 'photo-placeholder',
+      selectBtnId: 'btn-select-photo',
+      overlayId: 'fotoCropOverlay',
+      cropImgId: 'fotoCropImage',
+      closeBtnId: 'fotoCropClose',
+      cancelBtnId: 'fotoCropCancel',
+      saveBtnId: 'fotoCropSave',
+      errorElId: 'fotoCropError',
+      maxSizeMb: 5,
+      outputSize: 400,
+      outputFilename: 'foto-perfil.jpg',
+      saveLabel: 'Aplicar recorte',
+      onSave: function (blob, helpers) {
+        const formData = new FormData();
+        formData.append('foto_perfil', blob, 'foto-perfil.jpg');
+
+        fetch('/perfil/foto', {
+          method: 'POST',
+          body: formData,
+          credentials: 'same-origin',
+          redirect: 'follow'
+        })
+          .then(function (res) {
+            if (res.ok) {
+              window.location.href = '/perfil';
+              return;
+            }
+            throw new Error('Error del servidor');
+          })
+          .catch(function () {
+            helpers.showError('No se pudo guardar la foto. Intenta de nuevo.');
+            helpers.resetSaveButton();
+          });
+      }
+    });
+
+    btnRemove.addEventListener('click', function () {
+      if (!confirm('¿Quitar tu foto de perfil?')) return;
+
+      fetch('/perfil/foto/eliminar', {
+        method: 'POST',
+        credentials: 'same-origin',
+        redirect: 'follow'
+      })
+        .then(function (res) {
+          if (res.ok) {
+            window.location.href = '/perfil';
+            return;
+          }
+          throw new Error('Error del servidor');
+        })
+        .catch(function () {
+          alert('No se pudo quitar la foto. Intenta de nuevo.');
+        });
+    });
+  });
+</script>

@@ -1,0 +1,929 @@
+<%
+  const puedeEditar = typeof isAdministrador !== 'undefined' && isAdministrador;
+%>
+<style>
+  .contenedor-personal {
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 0 60px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  @media (min-width: 1100px) {
+    .contenedor-personal {
+      width: calc(100% + 120px);
+      margin-left: -60px;
+    }
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .page-title {
+    color: #003a70;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.02em;
+  }
+
+  .page-description { color: #64748b; font-size: 0.9rem; margin: 0; font-weight: 400; }
+
+  .link-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: #64748b;
+    padding: 6px 0;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: color 0.15s;
+  }
+  .link-volver:hover { color: #003a70; }
+
+  .panel {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    margin-bottom: 24px;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .tabla-personal {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    text-align: left;
+  }
+
+  .tabla-personal thead { border-bottom: 1px solid #e2e8f0; }
+
+  .tabla-personal th {
+    background: #ffffff;
+    color: #64748b;
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.01em;
+    padding: 11px 14px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid #e2e8f0;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .tabla-personal th:hover { color: #334155; background: #f1f5f9; }
+  .tabla-personal th.sortable-active { color: #003a70; }
+  .tabla-personal td {
+    padding: 11px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  .tabla-personal tbody tr:last-child td { border-bottom: none; }
+  .tabla-personal tbody tr:hover td { background-color: #f8fafc; }
+
+  .tabla-personal .col-nombre { font-weight: 600; }
+  .link-nombre-colaborador {
+    color: #003a70;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.15s;
+  }
+  .link-nombre-colaborador:hover {
+    color: #0069c2;
+    text-decoration: underline;
+  }
+  .nombre-solo { color: #003a70; font-weight: 600; }
+  .tabla-personal .col-correo { color: #4a5568; }
+  .tabla-personal .col-telefono { color: #4a5568; }
+
+  .avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #dce8f5; }
+  .avatar-fallback {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: linear-gradient(135deg, #003a70, #0069c2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; color: #fff; font-weight: 700;
+  }
+
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+
+  .pill-area  { background: #dbeafe; color: #1e40af; }
+  .pill-ti    { background: #dcfce7; color: #166534; }
+  .pill-ventas { background: #fef9c3; color: #854d0e; }
+  .pill-admin { background: #fce7f3; color: #9d174d; }
+  .pill-ops   { background: #f3e8ff; color: #6b21a8; }
+  .pill-finanzas { background: #ffedd5; color: #9a3412; }
+  .pill-mktg  { background: #e0f2fe; color: #075985; }
+
+  .pill-rol-admin    { background: #dc2626; color: #fff; }
+  .pill-rol-rrhh     { background: #7c3aed; color: #fff; }
+  .pill-rol-usuario  { background: #64748b; color: #fff; }
+  .pill-rol-marketing { background: #0ea5e9; color: #fff; }
+  .pill-rol-gerencia { background: #d97706; color: #fff; }
+
+  .intranet-si { font-size: 1.1rem; color: #16a34a; }
+  .intranet-no { font-size: 1.1rem; color: #dc2626; }
+
+  .fab {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 1000;
+    width: 58px;
+    height: 58px;
+    border: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #003a70 0%, #0069c2 100%);
+    color: #fff;
+    font-size: 1.8rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 6px 20px rgba(0,58,112,0.45);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .fab:hover { transform: scale(1.1) rotate(10deg); box-shadow: 0 10px 28px rgba(0,58,112,0.55); color: #fff; }
+  .fab-tooltip {
+    position: fixed;
+    bottom: 34px;
+    right: 100px;
+    z-index: 999;
+    background: #1a202c;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .fab:hover + .fab-tooltip { opacity: 1; }
+
+  .popup-notification {
+    position: fixed; top: 20px; right: 20px; z-index: 9999;
+    min-width: 260px; max-width: calc(100% - 40px);
+    padding: 14px 18px; border-radius: 12px;
+    display: none; align-items: center; justify-content: space-between; gap: 12px;
+    color: #fff; font-weight: 700;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+  }
+  .popup-notification.success { background: #16a34a; }
+  .popup-notification.error   { background: #dc2626; }
+  .popup-notification.show    { display: flex; }
+  .popup-notification .popup-close { background: transparent; border: none; color: #fff; font-size: 1.1rem; cursor: pointer; }
+
+  .sort-arrow { font-size: 0.65rem; opacity: 0.45; margin-left: 4px; }
+  .tabla-personal th:hover .sort-arrow { opacity: 0.7; }
+
+  .modal-crear-colaborador {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 2100;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 20px 0;
+  }
+
+  .modal-crear-colaborador .modal-content {
+    background: #fff;
+    color: #1a202c;
+    width: 92%;
+    max-width: 620px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 28px 28px 24px;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+    position: relative;
+    margin: auto;
+  }
+
+  .modal-crear-colaborador .modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #94a3b8;
+  }
+
+  .modal-crear-colaborador .modal-close:hover { color: #475569; }
+
+  .modal-crear-colaborador h2 {
+    margin: 0 0 6px;
+    color: #003a70;
+    font-size: 1.35rem;
+  }
+
+  .modal-crear-desc {
+    margin: 0 0 18px;
+    color: #6b7280;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .modal-crear-error {
+    display: none;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .modal-crear-error.show { display: block; }
+
+  .modal-crear-colaborador .campo { margin-bottom: 16px; }
+  .modal-crear-colaborador .campo label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #374151;
+  }
+  .modal-crear-colaborador .campo input,
+  .modal-crear-colaborador .campo select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    color: #1f2937;
+    box-sizing: border-box;
+  }
+  .modal-crear-colaborador .campo input:focus,
+  .modal-crear-colaborador .campo select:focus {
+    outline: none;
+    border-color: #003a70;
+    box-shadow: 0 0 0 3px rgba(0, 58, 112, 0.12);
+  }
+  .modal-crear-colaborador .campo .phone-field__local { width: auto; }
+  .modal-crear-colaborador .campo .hint {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 4px;
+    display: block;
+  }
+  .modal-crear-colaborador .campo .field-error {
+    font-size: 0.8rem;
+    color: #dc2626;
+    margin-top: 4px;
+    display: none;
+  }
+  .modal-crear-colaborador .campo .field-error.show { display: block; }
+  .modal-crear-colaborador .required-mark { color: #dc2626; margin-left: 2px; }
+
+  .modal-form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
+
+  .modal-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .btn-modal-cancelar,
+  .btn-modal-guardar {
+    padding: 11px 18px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-modal-cancelar {
+    background: #f1f5f9;
+    color: #475569;
+  }
+
+  .btn-modal-guardar {
+    background: linear-gradient(135deg, #003a70 0%, #0069c2 100%);
+    color: #fff;
+  }
+
+  .modal-editar-colaborador {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 2100;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 20px 0;
+  }
+
+  .modal-editar-colaborador .modal-content {
+    background: #fff;
+    color: #1a202c;
+    width: 94%;
+    max-width: 960px;
+    max-height: 90vh;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+    position: relative;
+    margin: auto;
+  }
+
+  .modal-editar-colaborador .modal-close {
+    position: absolute;
+    z-index: 3;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #94a3b8;
+  }
+
+  .modal-editar-colaborador .modal-close:hover { color: #475569; }
+
+  .modal-editar-layout {
+    display: flex;
+    align-items: stretch;
+    max-height: 90vh;
+  }
+
+  .modal-editar-aside {
+    flex: 0 0 240px;
+    padding: 24px 20px;
+    border-right: 1px solid #e2e8f0;
+    background: #fff;
+    overflow-y: auto;
+  }
+
+  .modal-editar-main {
+    flex: 1;
+    min-width: 0;
+    padding: 24px 28px;
+    overflow-y: auto;
+    max-height: 90vh;
+  }
+
+  .modal-editar-title {
+    color: #003a70;
+    font-size: 1.25rem;
+    margin: 0 0 6px;
+  }
+
+  .modal-loading {
+    text-align: center;
+    padding: 48px 24px;
+    color: #64748b;
+    font-size: 0.95rem;
+  }
+
+  .modal-editar-colaborador .campo { margin-bottom: 16px; }
+  .modal-editar-colaborador .campo label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #374151;
+  }
+  .modal-editar-colaborador .campo input,
+  .modal-editar-colaborador .campo select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    color: #1f2937;
+    box-sizing: border-box;
+  }
+  .modal-editar-colaborador .campo input:focus,
+  .modal-editar-colaborador .campo select:focus {
+    outline: none;
+    border-color: #003a70;
+    box-shadow: 0 0 0 3px rgba(0, 58, 112, 0.12);
+  }
+  .modal-editar-colaborador .campo .hint {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 4px;
+    display: block;
+  }
+  .modal-editar-colaborador .campo .field-error {
+    font-size: 0.8rem;
+    color: #dc2626;
+    margin-top: 4px;
+    display: none;
+  }
+  .modal-editar-colaborador .campo .field-error.show { display: block; }
+  .modal-editar-colaborador .btn-photo-remove {
+    border: none;
+    background: transparent;
+    color: #b91c1c;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .modal-editar-colaborador .zona-peligro {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #fecaca;
+  }
+  .modal-editar-colaborador .zona-peligro h3 {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    color: #b91c1c;
+  }
+  .modal-editar-colaborador .zona-peligro p {
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    color: #6b7280;
+  }
+  .modal-editar-colaborador .btn-eliminar {
+    width: 100%;
+    padding: 11px 16px;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  @media (max-width: 640px) {
+    .modal-form-grid-2 { grid-template-columns: 1fr; }
+    .modal-form-actions { flex-direction: column-reverse; }
+    .btn-modal-cancelar,
+    .btn-modal-guardar { width: 100%; }
+    .modal-editar-layout { flex-direction: column; }
+    .modal-editar-aside {
+      flex: none;
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .modal-editar-main { max-height: none; }
+  }
+</style>
+
+<link rel="stylesheet" href="/css/phone-chile.css">
+<% if (puedeEditar) { %>
+<link rel="stylesheet" href="/css/horizontal-forms.css">
+<link rel="stylesheet" href="/css/profile-photo-crop.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<% } %>
+
+<%
+  function pillArea(area) {
+    if (!area) return 'pill pill-area';
+    const a = area.toLowerCase();
+    if (a.includes('ti') || a.includes('tecnolog') || a.includes('sistemas')) return 'pill pill-ti';
+    if (a.includes('vent') || a.includes('comercial')) return 'pill pill-ventas';
+    if (a.includes('admin') || a.includes('gerencia') || a.includes('direcc')) return 'pill pill-admin';
+    if (a.includes('operat') || a.includes('logist') || a.includes('bodega')) return 'pill pill-ops';
+    if (a.includes('finanz') || a.includes('contab') || a.includes('teso')) return 'pill pill-finanzas';
+    if (a.includes('market') || a.includes('comuni')) return 'pill pill-mktg';
+    return 'pill pill-area';
+  }
+  function pillRol(rol) {
+    if (!rol) return 'pill pill-rol-deshabilitado';
+    const r = rol.toLowerCase();
+    if (r === 'administrador' || r === 'admin') return 'pill pill-rol-admin';
+    if (r === 'deshabilitado') return 'pill pill-rol-deshabilitado';
+    return 'pill pill-rol-usuario';
+  }
+%>
+
+<%
+  const successMsg = (typeof success !== 'undefined' && success) ? success : null;
+  const errorMsg   = (typeof error   !== 'undefined' && error)   ? error   : null;
+%>
+
+<div id="popup" class="popup-notification <%= successMsg ? 'success show' : errorMsg ? 'error show' : '' %>">
+  <span><%= successMsg || errorMsg || '' %></span>
+  <button type="button" class="popup-close" onclick="hidePopup()">×</button>
+</div>
+
+<div class="contenedor-personal">
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">Colaboradores de Transworld Chile</h2>
+      <p class="page-description"><%= personas ? personas.length : 0 %> colaboradores en el registro</p>
+    </div>
+    <a href="/RRHH" class="link-volver">← Volver al menú</a>
+  </div>
+
+  <div class="panel">
+    <% if (!personas || personas.length === 0) { %>
+      <p style="text-align:center; color:#718096; padding:30px 0;">No hay colaboradores registrados.</p>
+    <% } else { %>
+      <table class="tabla-personal" id="tablaPersonal">
+        <thead>
+          <tr>
+            <th>Foto</th>
+            <th class="sortable sortable-active" onclick="sortTable(this)">Nombre <span class="sort-arrow">↑</span></th>
+            <th class="sortable" onclick="sortTable(this)">Área <span class="sort-arrow">↕</span></th>
+            <th class="sortable" onclick="sortTable(this)">Correo <span class="sort-arrow">↕</span></th>
+            <th class="sortable" onclick="sortTable(this)">Teléfono <span class="sort-arrow">↕</span></th>
+            <th class="sortable" onclick="sortTable(this)">Cumpleaños <span class="sort-arrow">↕</span></th>
+            <th class="sortable" onclick="sortTable(this)">Rol <span class="sort-arrow">↕</span></th>
+            <% if (puedeEditar) { %>
+              <th class="sortable" style="text-align:center;" onclick="sortTable(this)">Correo verificado <span class="sort-arrow">↕</span></th>
+              <th class="sortable" style="text-align:center;" onclick="sortTable(this)">Intranet <span class="sort-arrow">↕</span></th>
+            <% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% personas.forEach(p => { %>
+            <%
+              const firstName  = p.first_name  || '';
+              const lastName   = p.last_name   || '';
+              const nombreCompleto = [firstName, lastName].filter(Boolean).join(' ') || '-';
+              const sortApellido = (lastName || firstName || '').toLowerCase();
+              const inicial    = (firstName || lastName).charAt(0).toUpperCase();
+              const areaNombre = p.area || '-';
+              const correo   = p.email    || '-';
+              const telefono = p.telefono || '-';
+              const telefonoHref = p.telefonoHref || null;
+              const rol = p.role || 'Usuario';
+              const cumpleSort = p.ordenCumple !== undefined ? p.ordenCumple : 9999;
+              const cumpleFmt  = p.fechaCumpleFmt || '-';
+              const enIntranet = p.usuario_intranet === true || p.usuario_intranet === 't' || p.usuario_intranet === 1;
+              const tieneCorreo = Boolean(p.email && String(p.email).trim());
+              const correoVerificado = p.email_confirmed === true || p.email_confirmed === 't' || p.email_confirmed === 1;
+            %>
+            <tr>
+              <td>
+                <% if (p.foto) { %>
+                  <img src="<%= p.foto %>" alt="Foto" class="avatar">
+                <% } else { %>
+                  <div class="avatar-fallback"><%= inicial %></div>
+                <% } %>
+              </td>
+
+              <td class="col-nombre" data-sort="<%= sortApellido %>">
+                <% if (puedeEditar) { %>
+                  <a href="#" class="link-nombre-colaborador link-editar-colaborador" data-id="<%= p.id %>" title="Editar colaborador"><%= nombreCompleto %></a>
+                <% } else { %>
+                  <span class="nombre-solo"><%= nombreCompleto %></span>
+                <% } %>
+              </td>
+
+              <td>
+                <span class="<%= pillArea(areaNombre) %>"><%= areaNombre %></span>
+              </td>
+
+              <td class="col-correo"><%= correo %></td>
+              <td class="col-telefono">
+                <% if (telefonoHref) { %>
+                  <a href="<%= telefonoHref %>" class="link-nombre-colaborador"><%= telefono %></a>
+                <% } else { %>
+                  <%= telefono %>
+                <% } %>
+              </td>
+
+              <td class="col-cumple" data-sort="<%= cumpleSort %>">
+                <% if (cumpleFmt !== '-') { %>
+                  🎂 <%= cumpleFmt %>
+                <% } else { %>
+                  <span style="color:#a0aec0;">-</span>
+                <% } %>
+              </td>
+
+              <td>
+                <span class="<%= pillRol(rol) %>"><%= rol %></span>
+              </td>
+
+              <% if (puedeEditar) { %>
+                <td style="text-align:center;" data-sort="<%= !tieneCorreo ? 2 : correoVerificado ? 0 : 1 %>">
+                  <% if (!tieneCorreo) { %>
+                    <span style="color:#a0aec0;" title="Sin correo registrado">-</span>
+                  <% } else if (correoVerificado) { %>
+                    <span class="intranet-si" title="Correo verificado">✔</span>
+                  <% } else { %>
+                    <span class="intranet-no" title="Correo pendiente de verificación">✘</span>
+                  <% } %>
+                </td>
+                <td style="text-align:center;" data-sort="<%= enIntranet ? 0 : 1 %>">
+                  <% if (enIntranet) { %>
+                    <span class="intranet-si" title="Registrado en intranet">✔</span>
+                  <% } else { %>
+                    <span class="intranet-no" title="No registrado en intranet">✘</span>
+                  <% } %>
+                </td>
+              <% } %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+</div>
+
+<% if (puedeEditar) { %>
+  <button type="button" class="fab" title="Agregar colaborador" onclick="abrirModalCrear()">＋</button>
+  <span class="fab-tooltip">Agregar colaborador</span>
+
+  <div id="modalCrearColaborador" class="modal-overlay modal-crear-colaborador" aria-hidden="true">
+    <div class="modal-content">
+      <button type="button" class="modal-close" onclick="cerrarModalCrear()" aria-label="Cerrar">&times;</button>
+      <h2>Agregar Colaborador</h2>
+      <p class="modal-crear-desc">Puede agregar a un colaborador con su correo electrónico, o también puede agregar el cumpleaños de un colaborador.</p>
+      <div id="crearColaboradorError" class="modal-crear-error" role="alert"></div>
+      <%- include('partials/persona_crear_form') %>
+    </div>
+  </div>
+
+  <div id="modalEditarColaborador" class="modal-overlay modal-editar-colaborador" aria-hidden="true">
+    <div class="modal-content">
+      <button type="button" class="modal-close" onclick="cerrarModalEditar()" aria-label="Cerrar">&times;</button>
+      <div id="editarColaboradorError" class="modal-crear-error" role="alert" style="margin: 16px 20px 0;"></div>
+      <div id="modalEditarColaboradorBody">
+        <p class="modal-loading">Cargando colaborador…</p>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<script src="/js/email-validate.js"></script>
+<script src="/js/phone-chile.js"></script>
+<% if (puedeEditar) { %>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="/js/profile-photo-cropper.js"></script>
+<script src="/js/persona-editar-form.js"></script>
+<% } %>
+<script>
+  const sortDir = { 1: true };
+
+  function sortTable(th) {
+    const colIdx = Array.from(th.parentElement.children).indexOf(th);
+    const tbody = document.querySelector('#tablaPersonal tbody');
+    const rows  = Array.from(tbody.querySelectorAll('tr'));
+    const asc   = !sortDir[colIdx];
+    sortDir[colIdx] = asc;
+
+    document.querySelectorAll('#tablaPersonal th.sortable').forEach(h => h.classList.remove('sortable-active'));
+    th.classList.add('sortable-active');
+
+    rows.sort((a, b) => {
+      const cellA = a.querySelectorAll('td')[colIdx];
+      const cellB = b.querySelectorAll('td')[colIdx];
+      const valA  = (cellA.dataset.sort ?? cellA.innerText).trim().toLowerCase();
+      const valB  = (cellB.dataset.sort ?? cellB.innerText).trim().toLowerCase();
+      const numA  = parseFloat(valA), numB = parseFloat(valB);
+      if (!isNaN(numA) && !isNaN(numB)) return asc ? numA - numB : numB - numA;
+      if (valA < valB) return asc ? -1 : 1;
+      if (valA > valB) return asc ? 1 : -1;
+      return 0;
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+  }
+
+  function hidePopup() {
+    const popup = document.getElementById('popup');
+    if (popup) popup.classList.remove('show');
+  }
+
+  function toggleCrearFieldError(el, message) {
+    if (!el) return;
+    if (message) {
+      el.textContent = message;
+      el.classList.add('show');
+    } else {
+      el.textContent = '';
+      el.classList.remove('show');
+    }
+  }
+
+  function limpiarQueryCrear() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('crearError');
+    url.searchParams.delete('abrirCrear');
+    window.history.replaceState({}, document.title, url.pathname + url.search);
+  }
+
+  function mostrarErrorCrear(message) {
+    const el = document.getElementById('crearColaboradorError');
+    if (!el) return;
+    if (message) {
+      el.textContent = message;
+      el.classList.add('show');
+    } else {
+      el.textContent = '';
+      el.classList.remove('show');
+    }
+  }
+
+  function abrirModalCrear() {
+    IntranetModal.open('modalCrearColaborador');
+  }
+
+  function cerrarModalCrear() {
+    IntranetModal.close('modalCrearColaborador');
+    mostrarErrorCrear('');
+    limpiarQueryCrear();
+  }
+
+  let destroyEditarForm = null;
+
+  function limpiarQueryEditar() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('editar');
+    url.searchParams.delete('editarError');
+    window.history.replaceState({}, document.title, url.pathname + url.search);
+  }
+
+  function mostrarErrorEditar(message) {
+    const el = document.getElementById('editarColaboradorError');
+    if (!el) return;
+    if (message) {
+      el.textContent = message;
+      el.classList.add('show');
+    } else {
+      el.textContent = '';
+      el.classList.remove('show');
+    }
+  }
+
+  async function abrirModalEditar(id, errorMsg) {
+    const body = document.getElementById('modalEditarColaboradorBody');
+    if (!body) return;
+
+    mostrarErrorEditar(errorMsg || '');
+    body.innerHTML = '<p class="modal-loading">Cargando colaborador…</p>';
+    IntranetModal.open('modalEditarColaborador');
+
+    try {
+      const res = await fetch(`/RRHH/editar/${encodeURIComponent(id)}?partial=1`, {
+        credentials: 'same-origin',
+      });
+      if (!res.ok) throw new Error('No se pudo cargar el colaborador');
+      body.innerHTML = await res.text();
+      if (destroyEditarForm) destroyEditarForm();
+      destroyEditarForm = typeof initPersonaEditarForm === 'function'
+        ? initPersonaEditarForm()
+        : null;
+    } catch (err) {
+      body.innerHTML = '<p class="modal-loading">No se pudo cargar el formulario de edición.</p>';
+      mostrarErrorEditar('Error al cargar los datos del colaborador.');
+    }
+  }
+
+  function cerrarModalEditar() {
+    IntranetModal.close('modalEditarColaborador');
+    if (destroyEditarForm) {
+      destroyEditarForm();
+      destroyEditarForm = null;
+    }
+    const body = document.getElementById('modalEditarColaboradorBody');
+    if (body) body.innerHTML = '<p class="modal-loading">Cargando colaborador…</p>';
+    mostrarErrorEditar('');
+    limpiarQueryEditar();
+  }
+
+  function initFormCrearColaborador() {
+    const form = document.getElementById('formCrearColaborador');
+    if (!form) return;
+
+    const emailInput = document.getElementById('crear_email');
+    const emailError = document.getElementById('crear_email-error');
+    const fechaInput = document.getElementById('crear_fecha_nacimiento');
+    const fechaMark = document.getElementById('crear_fecha_nacimiento_mark');
+    const fechaHint = document.getElementById('crear_fecha_nacimiento_hint');
+    const telefonoField = document.getElementById('crear_phone_field');
+    const telefonoLocal = document.getElementById('crear_telefono_local');
+    const telefonoError = document.getElementById('crear_telefono-error');
+    const FECHA_REQUERIDA_MSG = 'La fecha de nacimiento es obligatoria para colaboradores sin correo.';
+
+    function syncFechaRequired() {
+      if (!fechaInput) return;
+      const obligatoria = EmailValidate.isEmpty(emailInput);
+      fechaInput.required = obligatoria;
+      if (fechaMark) fechaMark.hidden = !obligatoria;
+      if (fechaHint) fechaHint.hidden = obligatoria;
+      if (!obligatoria) fechaInput.setCustomValidity('');
+    }
+
+    EmailValidate.initField(emailInput);
+    PhoneChile.initField(telefonoField);
+
+    emailInput?.addEventListener('input', () => {
+      toggleCrearFieldError(
+        emailError,
+        !EmailValidate.isValid(emailInput) ? EmailValidate.ERROR_MSG : '',
+      );
+      syncFechaRequired();
+    });
+
+    telefonoLocal?.addEventListener('input', () => {
+      const invalid =
+        !PhoneChile.isFieldEmpty(telefonoField) &&
+        !PhoneChile.isFieldValid(telefonoField);
+      toggleCrearFieldError(telefonoError, invalid ? PhoneChile.ERROR_MSG : '');
+    });
+
+    syncFechaRequired();
+
+    form.addEventListener('submit', (event) => {
+      let hasError = false;
+
+      if (!EmailValidate.isValid(emailInput)) {
+        hasError = true;
+        toggleCrearFieldError(emailError, EmailValidate.ERROR_MSG);
+        emailInput.reportValidity();
+      }
+
+      if (
+        !PhoneChile.isFieldEmpty(telefonoField) &&
+        !PhoneChile.isFieldValid(telefonoField)
+      ) {
+        hasError = true;
+        toggleCrearFieldError(telefonoError, PhoneChile.ERROR_MSG);
+        telefonoLocal.reportValidity();
+      }
+
+      if (EmailValidate.isEmpty(emailInput) && !String(fechaInput?.value || '').trim()) {
+        hasError = true;
+        fechaInput.setCustomValidity(FECHA_REQUERIDA_MSG);
+        fechaInput.reportValidity();
+      }
+
+      if (hasError) event.preventDefault();
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const popup = document.getElementById('popup');
+    if (popup && popup.classList.contains('show')) {
+      setTimeout(hidePopup, 4500);
+    }
+
+    <% if (puedeEditar) { %>
+      initFormCrearColaborador();
+
+      document.querySelectorAll('.link-editar-colaborador').forEach((link) => {
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          const id = link.dataset.id;
+          if (id) abrirModalEditar(id);
+        });
+      });
+
+      const crearErrorInicial = <%- JSON.stringify(typeof crearError !== 'undefined' && crearError ? crearError : '') %>;
+      const abrirCrearModal = <%= (typeof abrirCrearModal !== 'undefined' && abrirCrearModal) ? 'true' : 'false' %>;
+      const editarIdInicial = <%- JSON.stringify(typeof editarId !== 'undefined' && editarId ? editarId : '') %>;
+      const editarErrorInicial = <%- JSON.stringify(typeof editarError !== 'undefined' && editarError ? editarError : '') %>;
+
+      if (abrirCrearModal) {
+        abrirModalCrear();
+        if (crearErrorInicial) mostrarErrorCrear(crearErrorInicial);
+      } else if (editarIdInicial) {
+        abrirModalEditar(editarIdInicial, editarErrorInicial);
+      }
+    <% } %>
+  });
+</script>

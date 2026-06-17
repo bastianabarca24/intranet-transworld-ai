@@ -1,0 +1,114 @@
+/* Tokens de diseño — modo claro */
+:root {
+  color-scheme: light;
+  --color-bg: #f0f4f8;
+  --color-bg-image-opacity: 1;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-surface-elevated: #ffffff;
+  --color-border: #e0e6ed;
+  --color-border-strong: #cbd5e0;
+  --color-text: #333333;
+  --color-text-muted: #4a5568;
+  --color-text-subtle: #64748b;
+  --color-heading: #003a70;
+  --color-link: #003a70;
+  --color-input-bg: #ffffff;
+  --color-input-text: #1a202c;
+  --color-overlay: rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-card-lg: 0 4px 20px rgba(0, 58, 112, 0.08);
+}
+
+.btn-cursos,
+.btn-dual.btn-cursos {
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+
+.btn-cursos:hover,
+.btn-dual.btn-cursos:hover {
+  background: #f8fafc;
+}
+
+/* ── Cursos / Academy ── */
+.cursos-sidebar {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: var(--shadow-card-lg) !important;
+}
+
+.cursos-sidebar .sidebar-brand {
+  border-bottom-color: var(--color-border) !important;
+}
+
+.cursos-sidebar .sidebar-nav a {
+  color: var(--color-text-muted) !important;
+}
+
+.cursos-sidebar .sidebar-nav a:hover {
+  background: var(--color-surface-muted) !important;
+  color: var(--color-heading) !important;
+}
+
+.cursos-sidebar .sidebar-nav a.active {
+  background: rgba(0, 58, 112, 0.08) !important;
+  color: var(--color-heading) !important;
+}
+
+.cursos-sidebar .sidebar-buttons {
+  border-top-color: var(--color-border) !important;
+}
+
+.cursos-sidebar .btn-volver-intranet {
+  background: var(--color-surface-muted) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border-strong) !important;
+}
+
+.cursos-sidebar .btn-volver-intranet:hover {
+  background: var(--color-surface-elevated) !important;
+}
+
+.cursos-welcome .welcome-title {
+  color: var(--color-heading) !important;
+}
+
+.cursos-welcome .welcome-text {
+  color: var(--color-text) !important;
+}
+
+.cursos-welcome .ppt-frame {
+  border-color: var(--color-border) !important;
+  box-shadow: var(--shadow-card-lg) !important;
+}
+
+/* ── Procesos — tarjetas (modo claro) ── */
+.card-opcion-exec,
+.folder-card-exec {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.card-opcion-exec:hover,
+.folder-card-exec:hover {
+  background: var(--color-surface-muted) !important;
+  border-color: var(--color-border-strong) !important;
+}
+
+.card-opcion-exec .card-title,
+.folder-card-exec .folder-title-exec {
+  color: var(--color-heading) !important;
+}
+
+.card-opcion-exec .card-desc {
+  color: var(--color-text-muted) !important;
+}
+
+.folder-card-exec .folder-count {
+  background: #edf2f7 !important;
+  color: var(--color-text-muted) !important;
+}
