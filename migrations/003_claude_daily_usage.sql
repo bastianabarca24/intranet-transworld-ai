@@ -12,3 +12,22 @@ CREATE TABLE IF NOT EXISTS claude_user_settings (
   user_id INTEGER PRIMARY KEY,
   limits_notice_seen_at TIMESTAMPTZ
 );
+
+-- Reparar tablas creadas sin PK (CREATE IF NOT EXISTS no altera esquema existente)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'claude_daily_usage_pkey'
+      AND conrelid = 'claude_daily_usage'::regclass
+  ) THEN
+    ALTER TABLE claude_daily_usage ADD CONSTRAINT claude_daily_usage_pkey PRIMARY KEY (user_id, usage_date);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'claude_user_settings_pkey'
+      AND conrelid = 'claude_user_settings'::regclass
+  ) THEN
+    ALTER TABLE claude_user_settings ADD CONSTRAINT claude_user_settings_pkey PRIMARY KEY (user_id);
+  END IF;
+END $$;

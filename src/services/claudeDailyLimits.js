@@ -6,6 +6,21 @@ const {
 
 let tablesReady = null;
 
+async function ensurePrimaryKey(table, constraintName, columns) {
+  const exists = await db.query(
+    `SELECT 1
+     FROM pg_constraint
+     WHERE conname = $1
+       AND conrelid = $2::regclass`,
+    [constraintName, table]
+  );
+  if (exists.rows.length > 0) return;
+
+  await db.query(
+    `ALTER TABLE ${table} ADD CONSTRAINT ${constraintName} PRIMARY KEY (${columns.join(", ")})`
+  );
+}
+
 async function ensureTables() {
   if (tablesReady) return tablesReady;
   tablesReady = (async () => {
@@ -24,6 +39,13 @@ async function ensureTables() {
         limits_notice_seen_at TIMESTAMPTZ
       )
     `);
+
+    // Tablas creadas antes de tener PK: CREATE IF NOT EXISTS no las altera.
+    await ensurePrimaryKey("claude_daily_usage", "claude_daily_usage_pkey", [
+      "user_id",
+      "usage_date",
+    ]);
+    await ensurePrimaryKey("claude_user_settings", "claude_user_settings_pkey", ["user_id"]);
   })();
   return tablesReady;
 }

@@ -1,13 +1,12 @@
 <%
   const tieneFoto = Boolean(usuario.foto);
   const sinDato = '—';
-  const fechaNacFmt = usuario.fecha_nacimiento
-    ? new Date(usuario.fecha_nacimiento).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
-    : sinDato;
   const rolFmt = usuario.role || 'Usuario';
   const correoVerificado = usuario.email_confirmed ? 'Verificado' : 'Pendiente de verificación';
+  const errorPerfil = typeof error !== 'undefined' ? error : null;
 %>
 <link rel="stylesheet" href="/css/horizontal-forms.css">
+<link rel="stylesheet" href="/css/phone-chile.css">
 <link rel="stylesheet" href="/css/profile-photo-crop.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 
@@ -50,59 +49,65 @@
 
       <span class="perfil-rol"><%= rolFmt.toUpperCase() %></span>
 
-      <div class="perfil-datos">
-        <div class="form-grid-2">
-          <div class="info-item">
-            <label>Nombre</label>
-            <span><%= usuario.first_name || sinDato %></span>
+      <% if (errorPerfil) { %>
+        <div class="perfil-alert perfil-alert--error"><%= errorPerfil %></div>
+      <% } %>
+
+      <form action="/perfil" method="POST" class="perfil-form">
+        <div class="perfil-datos">
+          <div class="form-grid-2">
+            <div class="perfil-field">
+              <label for="first_name">Nombre</label>
+              <input type="text" id="first_name" name="first_name" value="<%= usuario.first_name || '' %>" required autocomplete="given-name">
+            </div>
+            <div class="perfil-field">
+              <label for="last_name">Apellido</label>
+              <input type="text" id="last_name" name="last_name" value="<%= usuario.last_name || '' %>" required autocomplete="family-name">
+            </div>
           </div>
-          <div class="info-item">
-            <label>Apellido</label>
-            <span><%= usuario.last_name || sinDato %></span>
+
+          <div class="form-grid-2">
+            <div class="perfil-field">
+              <label for="email">Correo electrónico</label>
+              <input type="text" id="email" value="<%= usuario.email || sinDato %>" readonly class="perfil-input-readonly" aria-readonly="true">
+            </div>
+            <div class="perfil-field">
+              <label for="telefono_local">Teléfono</label>
+              <div class="phone-field" data-phone-chile>
+                <span class="phone-field__prefix" aria-hidden="true">+56</span>
+                <input type="tel" id="telefono_local" class="phone-field__local" required placeholder="9 1234 5678" maxlength="11" inputmode="numeric" autocomplete="tel-national" aria-label="Número celular sin código de país">
+                <input type="hidden" name="telefono" id="telefono" value="<%= usuario.telefono || '' %>">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="perfil-field">
+              <label for="area">Área de trabajo</label>
+              <input type="text" id="area" value="<%= usuario.area || sinDato %>" readonly class="perfil-input-readonly" aria-readonly="true">
+            </div>
+            <div class="perfil-field">
+              <label for="fecha_nacimiento">Fecha de nacimiento</label>
+              <input type="date" id="fecha_nacimiento" name="fecha_nacimiento" value="<%= usuario.fecha_nacimiento_input || '' %>" required autocomplete="bday">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="perfil-field">
+              <label for="role">Rol en intranet</label>
+              <input type="text" id="role" value="<%= rolFmt %>" readonly class="perfil-input-readonly" aria-readonly="true">
+            </div>
+            <div class="perfil-field">
+              <label for="email_confirmed">Estado del correo</label>
+              <input type="text" id="email_confirmed" value="<%= correoVerificado %>" readonly class="perfil-input-readonly" aria-readonly="true">
+            </div>
           </div>
         </div>
 
-        <div class="form-grid-2">
-          <div class="info-item">
-            <label>Correo electrónico</label>
-            <span><%= usuario.email || sinDato %></span>
-          </div>
-          <div class="info-item">
-            <label>Teléfono</label>
-            <% if (usuario.telefono) { %>
-              <% if (usuario.telefonoHref) { %>
-                <span><a href="<%= usuario.telefonoHref %>"><%= usuario.telefono %></a></span>
-              <% } else { %>
-                <span><%= usuario.telefono %></span>
-              <% } %>
-            <% } else { %>
-              <span><%= sinDato %></span>
-            <% } %>
-          </div>
+        <div class="perfil-form-actions">
+          <button type="submit" class="btn-guardar-perfil">Guardar cambios</button>
         </div>
-
-        <div class="form-grid-2">
-          <div class="info-item">
-            <label>Área de trabajo</label>
-            <span><%= usuario.area || sinDato %></span>
-          </div>
-          <div class="info-item">
-            <label>Fecha de nacimiento</label>
-            <span><%= fechaNacFmt %></span>
-          </div>
-        </div>
-
-        <div class="form-grid-2">
-          <div class="info-item">
-            <label>Rol en intranet</label>
-            <span><%= rolFmt %></span>
-          </div>
-          <div class="info-item">
-            <label>Estado del correo</label>
-            <span><%= correoVerificado %></span>
-          </div>
-        </div>
-      </div>
+      </form>
 
       <div class="perfil-acciones">
         <a href="/change-password" class="link-cambiar-pass">Cambiar contraseña</a>
@@ -137,10 +142,14 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="/js/phone-chile.js"></script>
 <script src="/js/profile-photo-cropper.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const btnRemove = document.getElementById('btn-remove-photo');
+    const telefonoField = document.querySelector('[data-phone-chile]');
+
+    PhoneChile.initField(telefonoField);
 
     ProfilePhotoCropper.init({
       fileInputId: 'foto',

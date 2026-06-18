@@ -78,7 +78,8 @@
       if (
         (target.classList.contains('modal-overlay') ||
           target.classList.contains('modal-imagen')) &&
-        target.classList.contains('is-open')
+        target.classList.contains('is-open') &&
+        target.dataset.dismiss !== 'false'
       ) {
         close(target);
       }
@@ -89,7 +90,7 @@
       const openOverlay = document.querySelector(
         '.modal-overlay.is-open, .modal-imagen.is-open',
       );
-      if (openOverlay) close(openOverlay);
+      if (openOverlay && openOverlay.dataset.dismiss !== 'false') close(openOverlay);
     });
   }
 

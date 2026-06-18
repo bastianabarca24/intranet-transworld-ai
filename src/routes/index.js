@@ -9,7 +9,12 @@ const { getWeather } = require("../services/weatherService");
 const linkedinService = require("../services/linkedinService");
 const requireRole = require("../middlewares/requireRole");
 const { isAdministrador, ROLES, normalizeRole } = require("../constants/roles");
-const { toTelHref, formatPhoneForDisplay } = require("../utils/phoneChile");
+const { toTitleCase } = require("../utils/formatName");
+const {
+  toTelHref,
+  formatPhoneForDisplay,
+  validateChileMobilePhone,
+} = require("../utils/phoneChile");
 const { sendMail } = require("../services/mailer");
 
 const storage = multer.memoryStorage();
@@ -25,6 +30,17 @@ let cachedIndicadores = {
 };
 let cachedClima = { temp: "--", icon: "⏳", desc: "Cargando...", sunset: null, manana: null };
 let cachedLinkedin = [];
+let cachedEventosPool = [];
+let cachedEventosCarouselAt = 0;
+
+function shuffleArray(items) {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
 
 async function updateDataBackground() {
   try {
@@ -135,6 +151,54 @@ async function fetchNoticiasHome() {
   return { noticiaDestacada, noticiasLista, mixedFeed };
 }
 
+async function fetchEventosCarousel() {
+  const cacheMs = 15 * 60 * 1000;
+  if (Date.now() - cachedEventosCarouselAt < cacheMs) {
+    return shuffleArray(cachedEventosPool).slice(0, 30);
+  }
+
+  try {
+    const { rows: eventos } = await db.query(
+      `SELECT nombre, slug
+       FROM eventos
+       ORDER BY fecha_creacion DESC
+       LIMIT 10`,
+    );
+
+    const galerias = await Promise.all(
+      eventos.map(async (evento) => {
+        try {
+          const archivos = await fileStorage.listFiles(`eventos/${evento.slug}`);
+          return archivos
+            .filter((item) => item.resource_type === "image")
+            .map((item) => ({
+              imagen: item.url,
+              nombre: evento.nombre,
+              slug: evento.slug,
+              created_at: item.created_at,
+            }));
+        } catch (err) {
+          console.warn(
+            `[HOME] No se pudo leer galería de ${evento.slug}:`,
+            err.message,
+          );
+          return [];
+        }
+      }),
+    );
+
+    cachedEventosPool = galerias
+      .flat()
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    cachedEventosCarouselAt = Date.now();
+
+    return shuffleArray(cachedEventosPool).slice(0, 30);
+  } catch (err) {
+    console.error("[HOME] Error cargando galería de eventos:", err.message);
+    return shuffleArray(cachedEventosPool).slice(0, 30);
+  }
+}
+
 // ==========================================
 // RUTA: HOME
 // ==========================================
@@ -168,7 +232,6 @@ router.get("/", async (req, res) => {
         AND EXTRACT(MONTH FROM u.fecha_nacimiento) = $1
       ORDER BY dia ASC, nombre ASC
     `;
-    const sqlEventos = `SELECT ef.url as imagen, e.nombre FROM eventos_fotos ef JOIN eventos e ON ef.evento_id = e.id ORDER BY RANDOM() LIMIT 30`;
     const sqlEventosPortada = `SELECT nombre, slug, imagen FROM eventos WHERE imagen IS NOT NULL AND imagen != '' ORDER BY fecha_creacion DESC LIMIT 8`;
 
     const emptyNoticiasHome = {
@@ -184,10 +247,7 @@ router.get("/", async (req, res) => {
           .query(sqlMes, [mes])
           .then((r) => r.rows)
           .catch(() => []),
-        db
-          .query(sqlEventos)
-          .then((r) => r.rows)
-          .catch(() => []),
+        fetchEventosCarousel().catch(() => []),
         fetchNoticiasHome().catch(() => emptyNoticiasHome),
         db
           .query(sqlEventosPortada)
@@ -239,10 +299,59 @@ router.get("/", async (req, res) => {
       platoManana,
       menuSemanal: platosRows,
       user: req.session.user,
+      showHomeTutorial:
+        req.session.user &&
+        req.session.user.id > 0 &&
+        req.session.user.show_home_tutorial === true,
     });
   } catch (err) {
     console.error("Error en Home:", err);
     res.status(500).send("Error cargando el inicio");
+  }
+});
+
+// ==========================================
+// TUTORIAL DE BIENVENIDA (PRIMER INICIO)
+// ==========================================
+router.post("/home/tutorial-visto", async (req, res) => {
+  if (!req.session.user || !req.session.user.id) {
+    return res.status(401).json({ ok: false });
+  }
+
+  const userId = req.session.user.id;
+  if (userId <= 0) {
+    req.session.user.show_home_tutorial = false;
+    req.session.user.home_tutorial_seen = true;
+    return res.json({ ok: true });
+  }
+
+  try {
+    await db.query(
+      `UPDATE users
+       SET home_tutorial_seen = TRUE,
+           last_login_at = COALESCE(last_login_at, NOW())
+       WHERE id = $1`,
+      [userId],
+    );
+    req.session.user.show_home_tutorial = false;
+    req.session.user.home_tutorial_seen = true;
+    return res.json({ ok: true });
+  } catch (err) {
+    if (err.code === "42703") {
+      try {
+        await db.query(
+          "UPDATE users SET home_tutorial_seen = TRUE WHERE id = $1",
+          [userId],
+        );
+      } catch (_) {
+        /* columna aún no migrada */
+      }
+      req.session.user.show_home_tutorial = false;
+      req.session.user.home_tutorial_seen = true;
+      return res.json({ ok: true });
+    }
+    console.error("[HOME] Error marcando tutorial visto:", err.message);
+    return res.status(500).json({ ok: false });
   }
 });
 
@@ -295,13 +404,71 @@ router.get("/perfil", async (req, res) => {
   const raw = rows[0];
   res.render("perfil", {
     titulo: "Mi Perfil",
+    error: req.query.error || null,
     usuario: {
       ...raw,
       role: normalizeRole(raw.role),
+      fecha_nacimiento_input: raw.fecha_nacimiento
+        ? new Date(raw.fecha_nacimiento).toISOString().slice(0, 10)
+        : "",
       telefono: formatPhoneForDisplay(raw.telefono) || raw.telefono,
       telefonoHref: toTelHref(raw.telefono),
     },
   });
+});
+
+router.post("/perfil", async (req, res) => {
+  if (!req.session.user) return res.redirect("/login");
+
+  const userId = req.session.user.id;
+  const firstName = toTitleCase(req.body.first_name);
+  const lastName = toTitleCase(req.body.last_name);
+  const fechaNacimiento = String(req.body.fecha_nacimiento || "").trim() || null;
+  const telefonoCheck = validateChileMobilePhone(req.body.telefono, {
+    required: true,
+  });
+
+  if (!firstName || !lastName || !fechaNacimiento) {
+    return res.redirect(
+      `/perfil?error=${encodeURIComponent("Completa nombre, apellido y fecha de nacimiento.")}`,
+    );
+  }
+
+  if (!telefonoCheck.valid) {
+    return res.redirect(
+      `/perfil?error=${encodeURIComponent(telefonoCheck.error)}`,
+    );
+  }
+
+  try {
+    await db.query(
+      `UPDATE users
+       SET first_name = $1,
+           last_name = $2,
+           fecha_nacimiento = $3,
+           telefono = $4
+       WHERE id = $5`,
+      [
+        firstName,
+        lastName,
+        fechaNacimiento,
+        telefonoCheck.storageValue,
+        userId,
+      ],
+    );
+
+    req.session.user.first_name = firstName;
+    req.session.user.last_name = lastName;
+    req.session.user.telefono = telefonoCheck.storageValue;
+    req.session.user.fecha_nacimiento = fechaNacimiento;
+
+    res.redirect("/perfil?ok=Perfil+actualizado");
+  } catch (err) {
+    console.error("Error actualizando perfil:", err);
+    res.redirect(
+      `/perfil?error=${encodeURIComponent("No se pudo actualizar el perfil. Intenta nuevamente.")}`,
+    );
+  }
 });
 
 router.post("/perfil/foto", upload.single("foto_perfil"), async (req, res) => {
@@ -1126,24 +1293,7 @@ router.post(
 // LINKEDIN
 // ==========================================
 router.get("/auth/linkedin/renovar", (req, res) => {
-  const urlLogin = linkedinService.getAuthorizationUrl();
-  res.redirect(urlLogin);
-});
-
-router.get("/auth/linkedin/callback", async (req, res) => {
-  const code = req.query.code;
-  if (code) {
-    try {
-      await linkedinService.exchangeCodeForToken(code);
-      res.send(
-        "Token de LinkedIn renovado y guardado en la BD con éxito. Ya puede volver a la Intranet.",
-      );
-    } catch (error) {
-      res.status(500).send("Error al canjear el código. Revise la consola.");
-    }
-  } else {
-    res.send("No se recibió ningún código de LinkedIn.");
-  }
+  res.redirect(linkedinService.getAuthorizationUrl());
 });
 
 // ==========================================

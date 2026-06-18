@@ -38,7 +38,8 @@
 <nav class="mobile-sidebar" id="mobile-sidebar">
   <span class="close-btn" id="close-menu">&times;</span>
 
-  <a href="/sistemas/tickets" class="btn-ticket-mobile">TICKETS</a>
+  <a href="/sistemas/tickets/nuevo" class="btn-ticket-mobile js-open-ticket-modal" title="Abrir nuevo ticket de soporte">ABRIR TICKET</a>
+  <a href="/sistemas/tickets" class="ticket-notif-target">SOPORTE</a>
 
   <a href="/noticias">NOTICIAS</a>
   
@@ -65,15 +66,23 @@
     <a href="/apps">APLICACIONES</a>
   <% } %>
 
-  <a href="/perfil" title="Ir a mi perfil" class="user-name nav-user-link">
-            <% if (currentUser.foto) { %>
-              <img src="<%= currentUser.foto %>" alt="Foto" class="nav-user-photo">
-            <% } else { %>
-              <div class="nav-user-avatar">
-                <%= displayName.charAt(0).toUpperCase() %>
-              </div>
-            <% } %>
-          </a>
+  <% if (currentUser) { %>
+    <div class="nav-user-menu nav-user-menu--mobile">
+      <button type="button" class="user-name nav-user-link nav-user-trigger" aria-expanded="false" aria-haspopup="true" aria-label="Abrir menú de usuario">
+        <% if (currentUser.foto) { %>
+          <img src="<%= currentUser.foto %>" alt="Foto" class="nav-user-photo">
+        <% } else { %>
+          <div class="nav-user-avatar">
+            <%= displayName.charAt(0).toUpperCase() %>
+          </div>
+        <% } %>
+      </button>
+      <div class="nav-user-dropdown" role="menu">
+        <a href="/perfil" role="menuitem">Mi Perfil</a>
+        <a href="/logout" role="menuitem">Cerrar Sesión</a>
+      </div>
+    </div>
+  <% } %>
 </nav>
 
 <header>
@@ -111,6 +120,7 @@
         </div>
       </div>
       <div class="nav-item"><a href="/marketing/eventos">GALERÍA</a></div>
+      <div class="nav-item"><a href="/sistemas/tickets" class="ticket-notif-target">SOPORTE</a></div>
 
       <% if (typeof isAdministrador !== 'undefined' && isAdministrador) { %>
         <div class="nav-item"><a href="/apps">APPS</a></div>
@@ -119,7 +129,7 @@
     </nav>
     
     <div class="header-right">
-      <a href="/sistemas/tickets" class="btn-ticket-nav" title="Ir a Mesa de Ayuda">Tickets</a>
+      <a href="/sistemas/tickets/nuevo" class="btn-ticket-nav js-open-ticket-modal" title="Abrir nuevo ticket de soporte">Abrir Ticket</a>
 
       <div class="social-nav">
         <a href="https://www.linkedin.com/company/transworldpowerandtelecom" target="_blank" title="LinkedIn">
@@ -142,8 +152,8 @@
       </div>
 
       <% if (currentUser) { %>
-        <div class="nav-user">
-          <a href="/perfil" title="Ir a mi perfil" class="user-name nav-user-link">
+        <div class="nav-user nav-user-menu">
+          <button type="button" class="user-name nav-user-link nav-user-trigger" aria-expanded="false" aria-haspopup="true" aria-label="Abrir menú de usuario">
             <% if (currentUser.foto) { %>
               <img src="<%= currentUser.foto %>" alt="Foto" class="nav-user-photo">
             <% } else { %>
@@ -151,7 +161,11 @@
                 <%= displayName.charAt(0).toUpperCase() %>
               </div>
             <% } %>
-          </a>
+          </button>
+          <div class="nav-user-dropdown" role="menu">
+            <a href="/perfil" role="menuitem">Mi Perfil</a>
+            <a href="/logout" role="menuitem">Cerrar Sesión</a>
+          </div>
         </div>
       <% } %>
     </div>
@@ -163,6 +177,67 @@
         <%- body %>
     </div>
 </main>
+
+<% if (currentUser) { %>
+<div id="modalNuevoTicketNavbar" class="modal-overlay modal-ticket-navbar" role="dialog" aria-modal="true" aria-labelledby="ticket-modal-title" aria-hidden="true">
+  <div class="modal-content modal-ticket-navbar-content">
+    <button type="button" class="ticket-modal-close" aria-label="Cerrar modal de ticket" data-ticket-modal-close>&times;</button>
+    <h3 id="ticket-modal-title" class="ticket-modal-title">Abrir Nuevo Ticket de Soporte</h3>
+    <p class="ticket-modal-description">Describe tu problema o requerimiento tecnico a continuacion.</p>
+
+    <div class="ticket-modal-user-box">
+      <p>
+        <strong>Solicitante:</strong>
+        <%= currentUser ? (currentUser.username || displayName) : 'Usuario' %>
+        <span>(<%= currentUser && currentUser.email ? currentUser.email : 'Sin correo' %>)</span>
+      </p>
+    </div>
+
+    <form id="formCrearTicketNavbar" action="/sistemas/tickets/crear" method="POST" class="ticket-modal-form">
+      <label for="ticketModalTitulo">Resumen del problema (Titulo)</label>
+      <input type="text" id="ticketModalTitulo" name="titulo" placeholder="Ej: No puedo acceder a la carpeta compartida de Ventas" required>
+
+      <div class="ticket-modal-row">
+        <div>
+          <label for="ticketModalCategoria">Categoria</label>
+          <select id="ticketModalCategoria" name="categoria">
+            <option value="SAP">Soporte Tecnico</option>
+            <option value="Salesforce">Software / ERP</option>
+            <option value="Intranet">Infraestructura / Red</option>
+            <option value="Hardware">Hardware (Impresoras, PC, etc.)</option>
+            <option value="Otro" selected>Otro</option>
+          </select>
+        </div>
+        <div>
+          <label for="ticketModalPrioridad">Prioridad sugerida</label>
+          <select id="ticketModalPrioridad" name="prioridad">
+            <option value="Baja">Baja (No impide trabajar)</option>
+            <option value="Media" selected>Media (Dificulta el trabajo)</option>
+            <option value="Alta">Alta (Urgente / Operacion detenida)</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="ticketModalDescripcion">Descripcion detallada</label>
+      <textarea id="ticketModalDescripcion" name="descripcion" placeholder="Explica detalladamente que sucede..." required maxlength="2000"></textarea>
+      <div id="ticketModalCounter" class="ticket-modal-counter">0 / 2000</div>
+
+      <label class="ticket-modal-files-label">Adjuntar archivos (Opcional)</label>
+      <input type="hidden" name="adjuntos_data" id="ticketModalAdjuntosData" value="[]">
+      <div class="ticket-modal-upload-row">
+        <button type="button" class="btn-secundario" id="ticketModalSelectFiles">Seleccionar archivos</button>
+        <span id="ticketModalStatusUpload" class="ticket-modal-upload-status">Sin archivos seleccionados</span>
+      </div>
+      <input type="file" id="ticketModalFileInput" multiple accept="image/*,video/*,.pdf,.doc,.docx" hidden>
+
+      <div class="ticket-modal-actions">
+        <button type="button" class="btn-secundario" data-ticket-modal-close>Cancelar</button>
+        <button type="submit" class="btn-primario" id="ticketModalSubmit">Enviar Requerimiento</button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
 
 <footer>
   <div class="footer-content">
@@ -241,6 +316,37 @@
       });
     });
 
+    // --- MENÚ DE USUARIO EN NAVBAR ---
+    const userMenus = document.querySelectorAll('.nav-user-menu');
+
+    function closeUserMenus(exceptMenu) {
+      userMenus.forEach((menu) => {
+        if (menu === exceptMenu) return;
+        menu.classList.remove('is-open');
+        const trigger = menu.querySelector('.nav-user-trigger');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    userMenus.forEach((menu) => {
+      const trigger = menu.querySelector('.nav-user-trigger');
+      if (!trigger) return;
+
+      trigger.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const willOpen = !menu.classList.contains('is-open');
+        closeUserMenus(menu);
+        menu.classList.toggle('is-open', willOpen);
+        trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      });
+    });
+
+    document.addEventListener('click', () => closeUserMenus());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeUserMenus();
+    });
+
 
     // --- CÓDIGO EXISTENTE DEL TOAST ---
     const urlParams = new URLSearchParams(window.location.search);
@@ -261,7 +367,7 @@
 
     // --- BURBUJA DE NOTIFICACIONES ---
     function renderTicketBadges(count) {
-      const btnsTicket = document.querySelectorAll('.btn-ticket-nav, .btn-ticket-mobile');
+      const btnsTicket = document.querySelectorAll('.ticket-notif-target');
       btnsTicket.forEach(btn => {
         btn.querySelectorAll('.badge-notif').forEach(badge => badge.remove());
 
@@ -294,6 +400,156 @@
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) refreshTicketNotifications();
     });
+
+    // --- MODAL ABRIR TICKET DESDE NAVBAR ---
+    const ticketModalId = 'modalNuevoTicketNavbar';
+    const ticketModal = document.getElementById(ticketModalId);
+    const openTicketModalLinks = document.querySelectorAll('.js-open-ticket-modal');
+    const closeTicketModalButtons = document.querySelectorAll('[data-ticket-modal-close]');
+    const ticketForm = document.getElementById('formCrearTicketNavbar');
+
+    function resetTicketModalStatus() {
+      const statusDiv = document.getElementById('ticketModalStatusUpload');
+      const hiddenInput = document.getElementById('ticketModalAdjuntosData');
+      const fileInput = document.getElementById('ticketModalFileInput');
+      if (statusDiv) {
+        statusDiv.textContent = 'Sin archivos seleccionados';
+        statusDiv.style.color = '#666';
+      }
+      if (hiddenInput) hiddenInput.value = '[]';
+      if (fileInput) fileInput.value = '';
+    }
+
+    function prepareTicketModal() {
+      if (!ticketForm) return;
+      ticketForm.reset();
+      resetTicketModalStatus();
+      const counter = document.getElementById('ticketModalCounter');
+      if (counter) {
+        counter.innerText = '0 / 2000';
+        counter.style.color = '#666';
+        counter.style.fontWeight = 'normal';
+      }
+      const btnSubmit = document.getElementById('ticketModalSubmit');
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = 'Enviar Requerimiento';
+      }
+    }
+
+    openTicketModalLinks.forEach((link) => {
+      link.addEventListener('click', (e) => {
+        if (!window.IntranetModal || !ticketModal) return;
+        e.preventDefault();
+        prepareTicketModal();
+        IntranetModal.open(ticketModalId);
+      });
+    });
+
+    closeTicketModalButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (!window.IntranetModal || !ticketModal) return;
+        resetTicketModalStatus();
+        IntranetModal.close(ticketModalId);
+      });
+    });
+
+    if (ticketForm) {
+      const fileInput = document.getElementById('ticketModalFileInput');
+      const hiddenInput = document.getElementById('ticketModalAdjuntosData');
+      const statusDiv = document.getElementById('ticketModalStatusUpload');
+      const btnSubmit = document.getElementById('ticketModalSubmit');
+      const btnSelectFiles = document.getElementById('ticketModalSelectFiles');
+      const descInput = document.getElementById('ticketModalDescripcion');
+      const counter = document.getElementById('ticketModalCounter');
+
+      if (btnSelectFiles && fileInput) {
+        btnSelectFiles.addEventListener('click', () => fileInput.click());
+      }
+
+      if (fileInput && statusDiv) {
+        fileInput.addEventListener('change', () => {
+          statusDiv.style.color = '#666';
+          statusDiv.textContent = fileInput.files.length
+            ? `${fileInput.files.length} archivos listos para subir.`
+            : 'Sin archivos seleccionados';
+        });
+      }
+
+      if (descInput && counter) {
+        const refreshCounter = () => {
+          const currentLength = descInput.value.length;
+          counter.innerText = `${currentLength} / 2000`;
+          counter.style.color = currentLength >= 2000 ? '#dc3545' : '#666';
+          counter.style.fontWeight = currentLength >= 2000 ? 'bold' : 'normal';
+        };
+        descInput.addEventListener('input', refreshCounter);
+        refreshCounter();
+      }
+
+      ticketForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const files = fileInput ? Array.from(fileInput.files || []) : [];
+        if (files.length === 0) {
+          ticketForm.submit();
+          return;
+        }
+
+        for (const f of files) {
+          const isVideo = f.type.startsWith('video/');
+          const limit = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+          if (f.size > limit) {
+            alert(`Archivo muy pesado: ${f.name}`);
+            return;
+          }
+        }
+
+        try {
+          btnSubmit.disabled = true;
+          btnSubmit.innerText = 'Subiendo archivos...';
+          statusDiv.style.color = '#e67e22';
+          statusDiv.innerHTML = 'Iniciando subida...';
+
+          const uploadedList = [];
+          for (const file of files) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            let dbType = 'doc';
+            if (file.type.startsWith('video/')) dbType = 'video';
+            else if (file.type.startsWith('image/')) dbType = 'image';
+            else if (file.type === 'application/pdf') dbType = 'pdf';
+
+            const resUp = await fetch('/sistemas/tickets/upload', { method: 'POST', body: formData });
+            if (!resUp.ok) throw new Error('Fallo subida');
+            const data = await resUp.json();
+
+            uploadedList.push({ url: data.secure_url, nombre: file.name, tipo: dbType });
+          }
+
+          hiddenInput.value = JSON.stringify(uploadedList);
+          statusDiv.style.color = 'green';
+          statusDiv.innerHTML = 'Listo. Creando ticket...';
+          ticketForm.submit();
+        } catch (err) {
+          console.error(err);
+          statusDiv.style.color = 'red';
+          statusDiv.innerHTML = 'Error';
+          btnSubmit.disabled = false;
+          btnSubmit.innerText = 'Enviar Requerimiento';
+        }
+      });
+
+      if (ticketModal) {
+        ticketModal.addEventListener('transitionend', () => {
+          if (!ticketModal.classList.contains('is-open')) {
+            resetTicketModalStatus();
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = 'Enviar Requerimiento';
+          }
+        });
+      }
+    }
   });
 </script>
 

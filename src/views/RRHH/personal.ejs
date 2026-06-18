@@ -1,5 +1,6 @@
 <%
   const puedeEditar = typeof isAdministrador !== 'undefined' && isAdministrador;
+  const mostrarRol = typeof mostrarColumnaRol !== 'undefined' ? mostrarColumnaRol : puedeEditar;
 %>
 <style>
   .contenedor-personal {
@@ -569,7 +570,9 @@
             <th class="sortable" onclick="sortTable(this)">Correo <span class="sort-arrow">↕</span></th>
             <th class="sortable" onclick="sortTable(this)">Teléfono <span class="sort-arrow">↕</span></th>
             <th class="sortable" onclick="sortTable(this)">Cumpleaños <span class="sort-arrow">↕</span></th>
-            <th class="sortable" onclick="sortTable(this)">Rol <span class="sort-arrow">↕</span></th>
+            <% if (mostrarRol) { %>
+              <th class="sortable" onclick="sortTable(this)">Rol <span class="sort-arrow">↕</span></th>
+            <% } %>
             <% if (puedeEditar) { %>
               <th class="sortable" style="text-align:center;" onclick="sortTable(this)">Correo verificado <span class="sort-arrow">↕</span></th>
               <th class="sortable" style="text-align:center;" onclick="sortTable(this)">Intranet <span class="sort-arrow">↕</span></th>
@@ -633,9 +636,11 @@
                 <% } %>
               </td>
 
-              <td>
-                <span class="<%= pillRol(rol) %>"><%= rol %></span>
-              </td>
+              <% if (mostrarRol) { %>
+                <td>
+                  <span class="<%= pillRol(rol) %>"><%= rol %></span>
+                </td>
+              <% } %>
 
               <% if (puedeEditar) { %>
                 <td style="text-align:center;" data-sort="<%= !tieneCorreo ? 2 : correoVerificado ? 0 : 1 %>">

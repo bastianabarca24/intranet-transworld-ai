@@ -278,13 +278,29 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const { rows } = await pool.query(
-      `SELECT id, first_name, last_name, email, role, email_confirmed,
-              password_hash, password_salt, foto, must_change_password,
-              confirm_token, confirm_expires
-       FROM users WHERE email = $1 LIMIT 1`,
-      [email],
-    );
+    let rows;
+    try {
+      ({ rows } = await pool.query(
+        `SELECT id, first_name, last_name, email, role, email_confirmed,
+                password_hash, password_salt, foto, must_change_password,
+                confirm_token, confirm_expires, home_tutorial_seen, last_login_at
+         FROM users WHERE email = $1 LIMIT 1`,
+        [email],
+      ));
+    } catch (queryErr) {
+      if (queryErr.code !== "42703") throw queryErr;
+      ({ rows } = await pool.query(
+        `SELECT id, first_name, last_name, email, role, email_confirmed,
+                password_hash, password_salt, foto, must_change_password,
+                confirm_token, confirm_expires
+         FROM users WHERE email = $1 LIMIT 1`,
+        [email],
+      ));
+      rows.forEach((row) => {
+        row.home_tutorial_seen = true;
+        row.last_login_at = new Date();
+      });
+    }
 
     if (!rows.length) {
       return renderAuthPage(res, "login", {
@@ -340,6 +356,10 @@ router.post("/login", async (req, res) => {
 
     delete req.session.pendingPasswordReset;
 
+    const isFirstLogin = u.last_login_at == null;
+    const showHomeTutorial =
+      isFirstLogin || u.home_tutorial_seen === false;
+
     req.session.user = {
       id: u.id,
       username: u.email,
@@ -348,6 +368,8 @@ router.post("/login", async (req, res) => {
       nombre: u.first_name + (u.last_name ? " " + u.last_name : ""),
       foto: u.foto || null,
       must_change_password: u.must_change_password,
+      home_tutorial_seen: u.home_tutorial_seen !== false,
+      show_home_tutorial: showHomeTutorial,
     };
 
     if (u.must_change_password) {
@@ -482,8 +504,8 @@ router.post(
 
       await pool.query(
         `INSERT INTO users
-        (id, first_name, last_name, email, password_hash, password_salt, role, email_confirmed, confirm_token, confirm_expires, foto, must_change_password, area_trabajo_id, fecha_nacimiento, telefono, usuario_intranet)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8, $9, NULL, FALSE, NULL, $10, $11, TRUE)`,
+        (id, first_name, last_name, email, password_hash, password_salt, role, email_confirmed, confirm_token, confirm_expires, foto, must_change_password, area_trabajo_id, fecha_nacimiento, telefono, usuario_intranet, home_tutorial_seen)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8, $9, NULL, FALSE, NULL, $10, $11, TRUE, FALSE)`,
         [
           generatedUserId,
           firstName,

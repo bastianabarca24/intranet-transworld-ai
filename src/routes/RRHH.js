@@ -151,6 +151,7 @@ router.get("/personal", async (req, res) => {
 
   try {
     const { rows: results } = await db.query(sql);
+    const mostrarColumnaRol = Boolean(res.locals.isAdministrador);
 
     const personasFormateadas = results.map((p) => {
       const partes = parseFechaNacimiento(p.fecha_nacimiento);
@@ -162,13 +163,19 @@ router.get("/personal", async (req, res) => {
       const telefonoHref = toTelHref(p.telefono);
       const telefonoDisplay = formatPhoneForDisplay(p.telefono);
 
-      return {
+      const persona = {
         ...p,
         telefono: telefonoDisplay || p.telefono,
         ordenCumple,
         fechaCumpleFmt,
         telefonoHref,
       };
+
+      if (!mostrarColumnaRol) {
+        delete persona.role;
+      }
+
+      return persona;
     });
 
     // Leer mensajes flash de la querystring
@@ -192,6 +199,7 @@ router.get("/personal", async (req, res) => {
       titulo: "Personal",
       personas: personasFormateadas,
       areas,
+      mostrarColumnaRol,
       user: req.session.user,
       success: successMsg,
       error: null,
@@ -287,8 +295,8 @@ router.post("/crear", requireRole.administrador(), async (req, res) => {
 
       await db.query(
         `INSERT INTO users
-          (id, first_name, last_name, email, password_hash, password_salt, role, email_confirmed, must_change_password, area_trabajo_id, fecha_nacimiento, telefono, usuario_intranet)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, TRUE, $8, $9, $10, TRUE)`,
+          (id, first_name, last_name, email, password_hash, password_salt, role, email_confirmed, must_change_password, area_trabajo_id, fecha_nacimiento, telefono, usuario_intranet, home_tutorial_seen)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, TRUE, $8, $9, $10, TRUE, FALSE)`,
         [
           userId,
           firstName,

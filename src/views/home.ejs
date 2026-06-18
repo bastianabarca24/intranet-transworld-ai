@@ -61,6 +61,10 @@
   const nombresDiasMenu = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
   let diaActualMenu = new Date().getDay();
   if (diaActualMenu === 0 || diaActualMenu === 6) diaActualMenu = 1;
+
+  const imagenesGaleria = (typeof eventosCarousel !== 'undefined' && eventosCarousel)
+    ? eventosCarousel
+    : [];
 %>
 
 <div class="home-page">
@@ -287,45 +291,159 @@
       </section>
     </div>
 
-    <!-- Comunicaciones -->
-    <section class="home-section home-comms" aria-labelledby="home-comms-title">
-      <div class="home-section__head">
-        <h2 class="home-section__title" id="home-comms-title">Comunicaciones</h2>
-      </div>
-
-      <div class="home-glass home-comms__frame" id="homeCommsCarousel">
-        <button type="button" class="home-comms__nav home-comms__nav--prev" onclick="moveLinkedin(-1)" aria-label="Anterior">&#10094;</button>
-        <button type="button" class="home-comms__nav home-comms__nav--next" onclick="moveLinkedin(1)" aria-label="Siguiente">&#10095;</button>
-
-        <% if (typeof linkedinFeed !== 'undefined' && linkedinFeed.length > 0) { %>
-          <% linkedinFeed.forEach((post, index) => { %>
-            <div class="home-comms__slide<%= index === 0 ? ' is-active' : '' %>">
-              <a href="<%= post.enlace_url %>" target="_blank" rel="noopener noreferrer" class="home-comms__link" title="<%= post.texto %>">
-                <% if (post.imagen_url === '/img/fondo-home.png') { %>
-                  <% const parrafos = (post.texto || '').split('\n').filter(p => p.trim().length > 0); %>
-                  <% const textoResumen = parrafos.slice(0, 2).join('<br><br>'); %>
-                  <div class="home-comms__text-card">
-                    <div class="home-comms__text-summary"><%- textoResumen %></div>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="56" height="56" fill="#0a66c2" class="home-comms__linkedin-icon" aria-hidden="true">
-                      <path d="M20.5 2h-17A1.5 1.5 0 002 3.5v17A1.5 1.5 0 003.5 22h17a1.5 1.5 0 001.5-1.5v-17A1.5 1.5 0 0020.5 2zM8 19H5v-9h3zM6.5 8.25A1.75 1.75 0 118.3 6.5a1.78 1.78 0 01-1.8 1.75zM19 19h-3v-4.74c0-1.42-.6-1.93-1.38-1.93A1.74 1.74 0 0013 14.19a.66.66 0 000 .14V19h-3v-9h2.9v1.3a3.11 3.11 0 012.7-1.4c1.55 0 3.36.86 3.36 3.66z"></path>
-                    </svg>
-                    <p class="home-comms__cta">Haga click para ver más...</p>
-                  </div>
-                <% } else { %>
-                  <img src="<%= post.imagen_url %>" alt="Publicación LinkedIn" class="home-comms__img" onerror="this.src='/img/fondo-home.png'">
-                <% } %>
-              </a>
-            </div>
-          <% }); %>
-        <% } else { %>
-          <div class="home-comms__slide is-active">
-            <div class="home-comms__empty">Actualizando comunicaciones...</div>
+    <div class="home-dash__col">
+      <!-- Galería Transworld -->
+      <section class="home-section home-gallery" aria-labelledby="home-gallery-title">
+        <div class="home-section__head">
+          <div>
+            <h2 class="home-section__title" id="home-gallery-title">Galería Transworld</h2>
+            <p class="home-section__sub">Disfruta de los momentos más especiales de nuestra empresa</p>
           </div>
-        <% } %>
-      </div>
-    </section>
+          <a href="/marketing/eventos" class="home-section__link">Ver galería →</a>
+        </div>
+
+        <div class="home-glass home-gallery__card" id="homeGalleryCarousel">
+          <% if (imagenesGaleria.length > 0) { %>
+            <% if (imagenesGaleria.length > 1) { %>
+              <button type="button" class="home-gallery__nav home-gallery__nav--prev" onclick="moveHomeGallery(-1)" aria-label="Imagen anterior">&#10094;</button>
+              <button type="button" class="home-gallery__nav home-gallery__nav--next" onclick="moveHomeGallery(1)" aria-label="Imagen siguiente">&#10095;</button>
+            <% } %>
+
+            <div class="home-gallery__viewport">
+              <% imagenesGaleria.forEach((item, index) => { %>
+                <article class="home-gallery__slide<%= index === 0 ? ' is-active' : '' %>">
+                  <a href="/marketing/eventos/<%= item.slug %>" class="home-gallery__link" title="Ver galería de <%= item.nombre %>">
+                    <img
+                      src="<%= item.imagen %>"
+                      alt="Imagen de la galería de <%= item.nombre %>"
+                      class="home-gallery__img"
+                      loading="<%= index === 0 ? 'eager' : 'lazy' %>"
+                      onerror="this.src='/img/fondo-home.png'"
+                    >
+                    <div class="home-gallery__overlay">
+                      <span class="home-gallery__eyebrow">Galería de eventos</span>
+                      <h3 class="home-gallery__title"><%= item.nombre %></h3>
+                      <span class="home-gallery__cta">Ver fotos</span>
+                    </div>
+                  </a>
+                </article>
+              <% }); %>
+            </div>
+
+            <% if (imagenesGaleria.length > 1) { %>
+              <div class="home-gallery__dots" aria-label="Paginación de galería">
+                <% imagenesGaleria.forEach((item, index) => { %>
+                  <button type="button" class="home-gallery__dot<%= index === 0 ? ' is-active' : '' %>" data-gallery-index="<%= index %>" aria-label="Ver imagen <%= index + 1 %>"></button>
+                <% }); %>
+              </div>
+            <% } %>
+          <% } else { %>
+            <div class="home-gallery__empty">
+              <span class="home-gallery__empty-icon" aria-hidden="true">🖼️</span>
+              <span>No hay imágenes disponibles en la galería por ahora.</span>
+            </div>
+          <% } %>
+        </div>
+      </section>
+
+      <!-- Comunicaciones -->
+      <section class="home-section home-comms" aria-labelledby="home-comms-title">
+        <div class="home-section__head">
+          <h2 class="home-section__title" id="home-comms-title">Comunicaciones</h2>
+        </div>
+
+        <div class="home-glass home-comms__frame" id="homeCommsCarousel">
+          <button type="button" class="home-comms__nav home-comms__nav--prev" onclick="moveLinkedin(-1)" aria-label="Anterior">&#10094;</button>
+          <button type="button" class="home-comms__nav home-comms__nav--next" onclick="moveLinkedin(1)" aria-label="Siguiente">&#10095;</button>
+
+          <% if (typeof linkedinFeed !== 'undefined' && linkedinFeed.length > 0) { %>
+            <% linkedinFeed.forEach((post, index) => { %>
+              <div class="home-comms__slide<%= index === 0 ? ' is-active' : '' %>">
+                <a href="<%= post.enlace_url %>" target="_blank" rel="noopener noreferrer" class="home-comms__link" title="<%= post.texto %>">
+                  <% if (post.imagen_url === '/img/fondo-home.png') { %>
+                    <% const parrafos = (post.texto || '').split('\n').filter(p => p.trim().length > 0); %>
+                    <% const textoResumen = parrafos.slice(0, 2).join('<br><br>'); %>
+                    <div class="home-comms__text-card">
+                      <div class="home-comms__text-summary"><%- textoResumen %></div>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="56" height="56" fill="#0a66c2" class="home-comms__linkedin-icon" aria-hidden="true">
+                        <path d="M20.5 2h-17A1.5 1.5 0 002 3.5v17A1.5 1.5 0 003.5 22h17a1.5 1.5 0 001.5-1.5v-17A1.5 1.5 0 0020.5 2zM8 19H5v-9h3zM6.5 8.25A1.75 1.75 0 118.3 6.5a1.78 1.78 0 01-1.8 1.75zM19 19h-3v-4.74c0-1.42-.6-1.93-1.38-1.93A1.74 1.74 0 0013 14.19a.66.66 0 000 .14V19h-3v-9h2.9v1.3a3.11 3.11 0 012.7-1.4c1.55 0 3.36.86 3.36 3.66z"></path>
+                      </svg>
+                      <p class="home-comms__cta">Haga click para ver más...</p>
+                    </div>
+                  <% } else { %>
+                    <img src="<%= post.imagen_url %>" alt="Publicación LinkedIn" class="home-comms__img" onerror="this.src='/img/fondo-home.png'">
+                  <% } %>
+                </a>
+              </div>
+            <% }); %>
+          <% } else { %>
+            <div class="home-comms__slide is-active">
+              <div class="home-comms__empty">Actualizando comunicaciones...</div>
+            </div>
+          <% } %>
+        </div>
+      </section>
+    </div>
   </section>
+
 </div>
+
+<% if (typeof showHomeTutorial !== 'undefined' && showHomeTutorial) { %>
+<%
+  const tutorialNombre = (typeof user !== 'undefined' && user && user.nombre)
+    ? user.nombre.trim().split(/\s+/)[0]
+    : 'bienvenido/a';
+%>
+<div id="modalHomeTutorial" class="modal-overlay home-tutorial-overlay" data-dismiss="false" role="dialog" aria-modal="true" aria-labelledby="home-tutorial-title" aria-hidden="true">
+  <div class="modal-content2 home-tutorial">
+    <div class="home-tutorial__badge" aria-hidden="true">Primer ingreso</div>
+    <h3 id="home-tutorial-title" class="home-tutorial__title">¡Hola, <%= tutorialNombre %>!</h3>
+    <p class="home-tutorial__lead">Te damos la bienvenida a la intranet de Transworld. Estos son los puntos clave para comenzar:</p>
+
+    <ol class="home-tutorial__steps">
+      <li class="home-tutorial__step">
+        <span class="home-tutorial__icon" aria-hidden="true">🏠</span>
+        <div>
+          <strong>Tu panel de inicio</strong>
+          <p>Indicadores financieros, clima, menú del casino y accesos rápidos a cursos y el sitio web.</p>
+        </div>
+      </li>
+      <li class="home-tutorial__step">
+        <span class="home-tutorial__icon" aria-hidden="true">📋</span>
+        <div>
+          <strong>Menú superior</strong>
+          <p>Noticias internas, procesos y documentos, RRHH y galería de eventos de la empresa.</p>
+        </div>
+      </li>
+      <li class="home-tutorial__step">
+        <span class="home-tutorial__icon" aria-hidden="true">🎫</span>
+        <div>
+          <strong>Soporte TI</strong>
+          <p>Usa <em>Soporte</em> en la barra superior para revisar la ticketera y el botón <em>Abrir Ticket</em> para crear un nuevo caso.</p>
+        </div>
+      </li>
+      <li class="home-tutorial__step">
+        <span class="home-tutorial__icon" aria-hidden="true">👤</span>
+        <div>
+          <strong>Tu perfil</strong>
+          <p>Haz clic en tu foto para actualizar tus datos, teléfono y foto de perfil.</p>
+        </div>
+      </li>
+      <li class="home-tutorial__step">
+        <span class="home-tutorial__icon" aria-hidden="true">✨</span>
+        <div>
+          <strong>Asistente IA</strong>
+          <p>El botón flotante en la esquina inferior te ayuda con consultas sobre la intranet.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="home-tutorial__actions">
+      <button type="button" id="btnHomeTutorialCerrar" class="modal-button-primary home-tutorial__btn">Entendido, comenzar</button>
+    </div>
+  </div>
+</div>
+<% } %>
 
 <% if (typeof isAdministrador !== 'undefined' && isAdministrador) { %>
 <div id="modalPlatos" class="modal-overlay">
@@ -393,8 +511,96 @@
     slides[linkedinIndex].classList.add('is-active');
   }
 
+  let homeGalleryIndex = 0;
+
+  function preloadHomeGalleryImage(index) {
+    const slides = document.querySelectorAll('.home-gallery__slide');
+    if (!slides.length) return;
+
+    const targetIndex = (index + slides.length) % slides.length;
+    const img = slides[targetIndex].querySelector('.home-gallery__img');
+    if (!img || img.dataset.preloaded === 'true') return;
+
+    const preload = new Image();
+    preload.src = img.currentSrc || img.src;
+    img.dataset.preloaded = 'true';
+  }
+
+  function setHomeGallerySlide(nextIndex) {
+    const slides = document.querySelectorAll('.home-gallery__slide');
+    const dots = document.querySelectorAll('.home-gallery__dot');
+    if (slides.length <= 1) return;
+
+    slides[homeGalleryIndex]?.classList.remove('is-active');
+    dots[homeGalleryIndex]?.classList.remove('is-active');
+
+    homeGalleryIndex = (nextIndex + slides.length) % slides.length;
+
+    slides[homeGalleryIndex].classList.add('is-active');
+    dots[homeGalleryIndex]?.classList.add('is-active');
+    preloadHomeGalleryImage(homeGalleryIndex + 1);
+  }
+
+  function moveHomeGallery(n) {
+    setHomeGallerySlide(homeGalleryIndex + n);
+  }
+
+  function goHomeGallery(index) {
+    setHomeGallerySlide(index);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const gallery = document.getElementById('homeGalleryCarousel');
+    const slides = document.querySelectorAll('.home-gallery__slide');
+    if (!gallery || slides.length <= 1) return;
+
+    gallery.querySelectorAll('.home-gallery__dot').forEach(function (dot) {
+      dot.addEventListener('click', function () {
+        goHomeGallery(Number(dot.dataset.galleryIndex || 0));
+      });
+    });
+    preloadHomeGalleryImage(homeGalleryIndex + 1);
+
+    let timer = window.setInterval(function () {
+      moveHomeGallery(1);
+    }, 6500);
+
+    gallery.addEventListener('mouseenter', function () {
+      window.clearInterval(timer);
+    });
+
+    gallery.addEventListener('mouseleave', function () {
+      timer = window.setInterval(function () {
+        moveHomeGallery(1);
+      }, 6500);
+    });
+  });
+
   window.addEventListener('click', function (event) {
     if (event.target.id === 'modalPlatos') IntranetModal.close('modalPlatos');
     if (event.target.id === 'modalVerMenu') IntranetModal.close('modalVerMenu');
   });
+
+  (function initHomeTutorial() {
+    const modal = document.getElementById('modalHomeTutorial');
+    const btn = document.getElementById('btnHomeTutorialCerrar');
+    if (!modal || !btn) return;
+
+    function cerrarTutorial() {
+      IntranetModal.close('modalHomeTutorial');
+      fetch('/home/tutorial-visto', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+      }).catch(function () {});
+    }
+
+    btn.addEventListener('click', cerrarTutorial);
+
+    document.addEventListener('DOMContentLoaded', function () {
+      IntranetModal.open('modalHomeTutorial');
+    });
+    if (document.readyState !== 'loading') {
+      IntranetModal.open('modalHomeTutorial');
+    }
+  })();
 </script>
