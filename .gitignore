@@ -36,6 +36,9 @@ temp/
 
 # Archivos del sistema / IDE
 .DS_Store
+._*
+.AppleDouble
+.LSOverride
 Thumbs.db
 desktop.ini
 ~$*
