@@ -2,13 +2,14 @@
 class ClaudeChat {
   constructor() {
     this.currentConversationId = null;
-    this.attachment = null;
+    this.attachments = [];
+    this.uploadedFilenamesInConversation = [];
     this.isStreaming = false;
     this.bootstrapped = false;
     this.config = window.CLAUDE_CONFIG || {};
-    this.usage = { messageCount: 0, fileCount: 0, maxMessages: 30, maxFiles: 5 };
+    this.usage = { messageCount: 0, fileCount: 0, maxMessages: 30, maxFiles: 5, unlimited: false };
     this.cache();
-    this.clearAttachment();
+    this.clearAttachments();
     this.bind();
     if (this.modelBadge) {
       this.modelBadge.textContent = "Modelo: " + this.getSelectedModelName();
@@ -43,8 +44,11 @@ class ClaudeChat {
     };
     this.config = window.CLAUDE_CONFIG;
     if (data.limits) {
-      this.usage.maxMessages = data.limits.maxMessages;
-      this.usage.maxFiles = data.limits.maxFiles;
+      this.usage.unlimited = Boolean(data.limits.unlimited);
+      if (!this.usage.unlimited) {
+        this.usage.maxMessages = data.limits.maxMessages;
+        this.usage.maxFiles = data.limits.maxFiles;
+      }
     }
     if (data.dailyUsage) this.applyUsage(data.dailyUsage);
 
@@ -146,10 +150,11 @@ class ClaudeChat {
     this.btnExtract = document.getElementById("btnExtract");
     this.fileInputChat = document.getElementById("fileInputChat");
     this.fileInputExtract = document.getElementById("fileInputExtract");
-    this.attachmentChip = document.getElementById("attachmentChip");
-    this.attachmentName = document.getElementById("attachmentName");
-    this.btnRemoveAttachment = document.getElementById("btnRemoveAttachment");
+    this.attachmentsArea = document.getElementById("attachmentsArea");
     this.usageEl = document.getElementById("dailyUsage");
+    this.dropOverlay = document.getElementById("dropZoneOverlay");
+    this.dropZoneChat = document.getElementById("dropZoneChat");
+    this.dropZoneExtract = document.getElementById("dropZoneExtract");
   }
 
   applyUsage(usage) {
@@ -161,7 +166,15 @@ class ClaudeChat {
 
   renderUsageIndicator() {
     if (!this.usageEl) return;
-    const { messageCount, fileCount, maxMessages, maxFiles } = this.usage;
+    const { messageCount, fileCount, maxMessages, maxFiles, unlimited } = this.usage;
+
+    if (unlimited) {
+      this.usageEl.hidden = false;
+      this.usageEl.textContent = `Uso diario: ${messageCount} mensajes · ${fileCount} archivos (sin límite)`;
+      this.usageEl.classList.remove("is-limit", "is-warning");
+      return;
+    }
+
     const atMessageLimit = messageCount >= maxMessages || messageCount + 2 > maxMessages;
     const atFileLimit = fileCount >= maxFiles;
     const nearMessageLimit = messageCount + 2 >= maxMessages;
@@ -174,6 +187,7 @@ class ClaudeChat {
   }
 
   canSendMessage({ withAttachment = false } = {}) {
+    if (this.usage.unlimited) return { ok: true };
     const { messageCount, fileCount, maxMessages, maxFiles } = this.usage;
     if (messageCount >= maxMessages || messageCount + 2 > maxMessages) {
       return {
@@ -191,6 +205,7 @@ class ClaudeChat {
   }
 
   canAnalyzeFile() {
+    if (this.usage.unlimited) return { ok: true };
     const { fileCount, maxFiles } = this.usage;
     if (fileCount >= maxFiles) {
       return {
@@ -215,10 +230,21 @@ class ClaudeChat {
     this.bindModelSelect();
 
     this.btnAttach.addEventListener("click", () => this.fileInputChat.click());
-    this.fileInputChat.addEventListener("change", (e) => this.uploadAttachment(e.target.files[0]));
+    this.fileInputChat.addEventListener("change", (e) => {
+      this.handleFiles(e.target.files);
+      this.fileInputChat.value = "";
+    });
     this.btnExtract.addEventListener("click", () => this.fileInputExtract.click());
-    this.fileInputExtract.addEventListener("change", (e) => this.extractPdf(e.target.files[0]));
-    this.btnRemoveAttachment.addEventListener("click", () => this.clearAttachment());
+    this.fileInputExtract.addEventListener("change", (e) => {
+      this.extractPdf(e.target.files[0]);
+      this.fileInputExtract.value = "";
+    });
+    this.attachmentsArea.addEventListener("click", (e) => {
+      const btn = e.target.closest(".btn-remove-attachment");
+      if (btn) this.removeAttachment(btn.dataset.attId);
+    });
+
+    this.setupDropZone();
 
     this.convList.addEventListener("click", (e) => {
       const rename = e.target.closest(".btn-rename-conv");
@@ -257,9 +283,9 @@ class ClaudeChat {
   onInput() {
     this.input.style.height = "auto";
     this.input.style.height = Math.min(this.input.scrollHeight, 180) + "px";
-    const sendCheck = this.canSendMessage({ withAttachment: Boolean(this.attachment) });
+    const sendCheck = this.canSendMessage({ withAttachment: this.attachments.length > 0 });
     this.sendBtn.disabled =
-      this.isStreaming || (!this.input.value.trim() && !this.attachment) || !sendCheck.ok;
+      this.isStreaming || (!this.input.value.trim() && !this.attachments.length) || !sendCheck.ok;
   }
 
   scrollToBottom() { this.scroll.scrollTop = this.scroll.scrollHeight; }
@@ -279,13 +305,18 @@ class ClaudeChat {
     return this.escapeHtml(text).replace(/\n/g, "<br>");
   }
 
-  addUserMessage(text, attachmentName) {
+  addUserMessage(text, attachmentNames) {
     this.hideWelcome();
     const el = document.createElement("div");
     el.className = "msg user";
-    const att = attachmentName
-      ? `<div class="msg-attachment">📎 ${this.escapeHtml(attachmentName)}</div>`
-      : "";
+    const names = Array.isArray(attachmentNames)
+      ? attachmentNames
+      : attachmentNames
+      ? [attachmentNames]
+      : [];
+    const att = names
+      .map((n) => `<div class="msg-attachment">📎 ${this.escapeHtml(n)}</div>`)
+      .join("");
     el.innerHTML = `<div class="msg-body">${att}${this.escapeHtml(text)}</div>`;
     this.thread.appendChild(el);
     this.scrollToBottom();
@@ -319,19 +350,20 @@ class ClaudeChat {
 
   async send() {
     const text = this.input.value.trim();
-    if (this.isStreaming || (!text && !this.attachment)) return;
+    if (this.isStreaming || (!text && !this.attachments.length)) return;
 
-    const sendCheck = this.canSendMessage({ withAttachment: Boolean(this.attachment) });
+    const sendCheck = this.canSendMessage({ withAttachment: this.attachments.length > 0 });
     if (!sendCheck.ok) {
       this.showLimitAlert(sendCheck.message);
       return;
     }
 
-    const attName = this.attachment?.fileName || null;
-    const attachmentId = this.attachment?.id || null;
-    this.addUserMessage(text, attName);
+    const attNames = this.attachments.map((a) => a.fileName);
+    const attachmentIds = this.attachments.map((a) => a.id);
+    this.uploadedFilenamesInConversation.push(...attNames);
+    this.addUserMessage(text, attNames);
     this.input.value = "";
-    this.clearAttachment();
+    this.clearAttachments();
     this.onInput();
 
     this.isStreaming = true;
@@ -349,7 +381,7 @@ class ClaudeChat {
           conversationId: this.currentConversationId,
           message: text,
           model: this.getSelectedModel(),
-          attachmentId,
+          attachmentIds,
         }),
       });
 
@@ -410,6 +442,7 @@ class ClaudeChat {
         })
       );
     } finally {
+      this.enhanceCodeBlocks(parts.textEl);
       parts.textEl.classList.remove("stream-cursor");
       this.isStreaming = false;
       this.onInput();
@@ -417,38 +450,79 @@ class ClaudeChat {
     }
   }
 
+  async handleFiles(fileList) {
+    const MAX = 5;
+    const remaining = MAX - this.attachments.length;
+    if (remaining <= 0) {
+      this.showLimitAlert(`Ya tienes ${MAX} archivos adjuntos (máximo por mensaje).`);
+      return;
+    }
+    const files = [...fileList].slice(0, remaining);
+    if ([...fileList].length > remaining) {
+      alert(`Solo se añadirán ${files.length} archivo(s). El máximo es ${MAX} por mensaje.`);
+    }
+    await Promise.all(files.map((f) => this.uploadAttachment(f)));
+  }
+
   async uploadAttachment(file) {
     if (!file) return;
+    if (this.attachments.length >= 5) {
+      this.showLimitAlert("Solo puedes adjuntar hasta 5 archivos por mensaje.");
+      return;
+    }
 
     const fileCheck = this.canAnalyzeFile();
     if (!fileCheck.ok) {
       this.showLimitAlert(fileCheck.message);
-      this.fileInputChat.value = "";
       return;
     }
 
+    const loadingChip = document.createElement("div");
+    loadingChip.className = "attachment-chip is-uploading";
+    loadingChip.innerHTML = `<span class="attachment-chip-name">⏳ ${this.escapeHtml(file.name)}</span>`;
+    this.attachmentsArea.appendChild(loadingChip);
+    this.attachmentsArea.hidden = false;
+
     const fd = new FormData();
     fd.append("file", file);
-    this.attachmentName.textContent = "Subiendo " + file.name + "…";
-    this.attachmentChip.hidden = false;
     try {
       const res = await fetch("/claude/api/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      this.attachment = { id: data.id, fileName: data.fileName, mimeType: data.mimeType };
-      this.attachmentName.textContent = data.fileName;
+      loadingChip.replaceWith(this._buildChip(data.id, data.fileName));
+      this.attachments.push({ id: data.id, fileName: data.fileName, mimeType: data.mimeType });
       this.onInput();
     } catch (err) {
-      this.attachmentChip.hidden = true;
+      loadingChip.remove();
+      if (!this.attachmentsArea.hasChildNodes()) this.attachmentsArea.hidden = true;
       alert("Error al subir: " + err.message);
     }
-    this.fileInputChat.value = "";
   }
 
-  clearAttachment() {
-    this.attachment = null;
-    this.attachmentChip.hidden = true;
-    this.attachmentName.textContent = "";
+  _buildChip(id, fileName) {
+    const chip = document.createElement("div");
+    chip.className = "attachment-chip";
+    chip.dataset.attId = id;
+    chip.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      <span class="attachment-chip-name">${this.escapeHtml(fileName)}</span>
+      <button class="btn-remove-attachment" data-att-id="${id}" type="button" title="Quitar">✕</button>`;
+    return chip;
+  }
+
+  removeAttachment(id) {
+    this.attachments = this.attachments.filter((a) => a.id !== id);
+    this.attachmentsArea.querySelector(`[data-att-id="${id}"]`)?.remove();
+    if (!this.attachmentsArea.hasChildNodes()) this.attachmentsArea.hidden = true;
+    this.onInput();
+  }
+
+  clearAttachments() {
+    this.attachments = [];
+    if (this.attachmentsArea) {
+      this.attachmentsArea.innerHTML = "";
+      this.attachmentsArea.hidden = true;
+    }
   }
 
   async extractPdf(file) {
@@ -538,7 +612,8 @@ class ClaudeChat {
 
   newConversation() {
     this.currentConversationId = null;
-    this.clearAttachment();
+    this.uploadedFilenamesInConversation = [];
+    this.clearAttachments();
     this.thread.innerHTML = "";
     const w = document.createElement("div");
     w.className = "welcome-section";
@@ -579,10 +654,10 @@ class ClaudeChat {
         } else {
           const el = document.createElement("div");
           el.className = "msg assistant";
-          el.innerHTML = `<div class="msg-avatar">✦</div><div class="msg-body"><div class="msg-text">${this.renderMarkdown(
-            m.content
-          )}</div></div>`;
+          el.innerHTML = `<div class="msg-avatar">✦</div><div class="msg-body"><div class="msg-text">${this.renderMarkdown(m.content)}</div></div>`;
           this.thread.appendChild(el);
+          const msgText = el.querySelector(".msg-text");
+          if (msgText) this.enhanceCodeBlocks(msgText);
         }
       });
       this.scrollToBottom();
@@ -704,6 +779,317 @@ class ClaudeChat {
     span.className = "conv-title";
     span.textContent = title;
     return span;
+  }
+
+  // ---- Tarjetas de descarga y botones en bloques de código ----
+
+  enhanceCodeBlocks(container) {
+    if (!container) return;
+
+    const LANG_EXT = {
+      javascript: "js", typescript: "ts", python: "py", ruby: "rb",
+      java: "java", csharp: "cs", cpp: "cpp", c: "c", go: "go",
+      rust: "rs", php: "php", swift: "swift", kotlin: "kt",
+      sql: "sql", json: "json", csv: "csv", xml: "xml", html: "html",
+      css: "css", scss: "scss", markdown: "md", md: "md",
+      bash: "sh", shell: "sh", sh: "sh", yaml: "yml", toml: "toml",
+      txt: "txt", text: "txt", ini: "ini", env: "env",
+    };
+    const LANG_MIME = {
+      json: "application/json", csv: "text/csv", html: "text/html",
+      xml: "application/xml", svg: "image/svg+xml",
+    };
+
+    container.querySelectorAll("pre:not(.code-enhanced)").forEach((pre) => {
+      pre.classList.add("code-enhanced");
+      const code = pre.querySelector("code");
+      const langClass = [...(code?.classList || [])].find((c) => c.startsWith("language-")) || "";
+      const rawLang = langClass.replace("language-", "").toLowerCase();
+
+      // Bloque de archivo descargable (```file) → tarjeta moderna, contenido oculto
+      if (rawLang === "file") {
+        const allText = code?.textContent || "";
+        const newline = allText.indexOf("\n");
+        const filename = (newline === -1 ? allText : allText.slice(0, newline)).trim();
+        const content = newline === -1 ? "" : allText.slice(newline + 1);
+        const ext = (filename.split(".").pop() || "file").toLowerCase();
+        const sizeLabel = this._formatFileSize(content);
+
+        const card = document.createElement("div");
+        card.className = `file-download-card file-download-card--${ext} is-appearing`;
+        card.innerHTML = `
+          <div class="fdc-badge" aria-hidden="true">
+            <svg class="fdc-badge-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            <span class="fdc-badge-ext">${this.escapeHtml(ext)}</span>
+          </div>
+          <div class="fdc-body">
+            <span class="fdc-name" title="${this.escapeHtml(filename || "archivo")}">${this.escapeHtml(filename || "archivo")}</span>
+            <span class="fdc-meta">${this.escapeHtml(this._fileCardMeta(ext))}${sizeLabel ? ` · ${sizeLabel}` : ""}</span>
+          </div>
+          <button class="fdc-btn" type="button" aria-label="Descargar ${this.escapeHtml(filename)}">
+            <span class="fdc-btn-icon">
+              <svg class="fdc-icon-download" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <svg class="fdc-icon-check" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>
+              <span class="fdc-spinner" aria-hidden="true"></span>
+            </span>
+            <span class="fdc-btn-label">Descargar</span>
+          </button>`;
+
+        const btn = card.querySelector(".fdc-btn");
+        btn.addEventListener("click", () => {
+          this._downloadFile(filename, content, btn);
+        });
+        requestAnimationFrame(() => card.classList.remove("is-appearing"));
+
+        pre.replaceWith(card);
+        return;
+      }
+
+      // Bloques de código normales: solo acciones en hover (respuestas sin adjuntos)
+      const lang = rawLang || "txt";
+      const ext = LANG_EXT[lang] || lang || "txt";
+      const mime = LANG_MIME[ext] || "text/plain";
+      const copyIcon = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+      const dlIcon = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+
+      const actions = document.createElement("div");
+      actions.className = "code-block-actions";
+
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "code-block-btn";
+      copyBtn.title = "Copiar al portapapeles";
+      copyBtn.innerHTML = `${copyIcon} Copiar`;
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard?.writeText(code?.textContent || "").then(() => {
+          copyBtn.textContent = "✓ Copiado";
+          setTimeout(() => { copyBtn.innerHTML = `${copyIcon} Copiar`; }, 1800);
+        });
+      });
+
+      const dlBtn = document.createElement("button");
+      dlBtn.className = "code-block-btn";
+      dlBtn.title = `Descargar como .${ext}`;
+      dlBtn.innerHTML = `${dlIcon} .${ext}`;
+      dlBtn.addEventListener("click", () => {
+        const blob = new Blob([code?.textContent || ""], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `archivo.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      actions.appendChild(copyBtn);
+      actions.appendChild(dlBtn);
+      pre.appendChild(actions);
+    });
+
+    // Si hay tarjeta de archivo, ocultar bloques de código sueltos (solo entrega de documento)
+    if (container.querySelector(".file-download-card")) {
+      container.querySelectorAll("pre.code-enhanced").forEach((pre) => pre.remove());
+    }
+  }
+
+  _formatFileSize(content) {
+    const bytes = new Blob([content]).size;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  _fileCardMeta(ext) {
+    const map = {
+      xlsx: "Hoja de cálculo Excel", xls: "Hoja de cálculo Excel", xlsm: "Hoja de cálculo Excel",
+      csv: "Datos CSV",
+      docx: "Documento Word", doc: "Documento Word",
+      pdf: "Documento PDF",
+      json: "Archivo JSON", xml: "Archivo XML",
+      html: "Página HTML", txt: "Texto plano", md: "Markdown",
+      png: "Imagen PNG", jpg: "Imagen JPEG", jpeg: "Imagen JPEG", webp: "Imagen WebP", gif: "Imagen GIF",
+    };
+    return map[ext] || "Listo para descargar";
+  }
+
+  _downloadFile(filename, content, btn) {
+    const card = btn?.closest(".file-download-card");
+    const label = btn?.querySelector(".fdc-btn-label");
+    if (btn?.classList.contains("is-loading")) return;
+
+    const setState = (state, text) => {
+      if (!btn) return;
+      btn.classList.toggle("is-loading", state === "loading");
+      btn.classList.toggle("is-done", state === "done");
+      btn.disabled = state === "loading";
+      card?.classList.toggle("is-loading", state === "loading");
+      if (label && text) label.textContent = text;
+    };
+
+    setState("loading", "Generando…");
+    this._exportAndDownload(filename, content)
+      .then(() => {
+        setState("done", "Descargado");
+        setTimeout(() => setState("idle", "Descargar"), 2200);
+      })
+      .catch((err) => {
+        console.error("[ClaudeChat] export-file:", err);
+        setState("idle", "Descargar");
+        alert(err.message || "No se pudo generar el archivo. Intenta de nuevo.");
+      });
+  }
+
+  _guessSourceFilename(downloadFilename) {
+    const ext = (downloadFilename.split(".").pop() || "").toLowerCase();
+    const base = downloadFilename.replace(/\.[^.]+$/, "");
+    const normalizedBase = base.replace(/-(editado|actualizado|modificado|final)$/i, "");
+
+    const candidates = [
+      downloadFilename,
+      `${normalizedBase}.${ext}`,
+    ];
+
+    for (const candidate of candidates) {
+      if (this.uploadedFilenamesInConversation.includes(candidate)) return candidate;
+    }
+
+    const fuzzy = this.uploadedFilenamesInConversation.find((name) => {
+      const uploadedBase = name.replace(/\.[^.]+$/, "");
+      return uploadedBase === normalizedBase;
+    });
+    return fuzzy || candidates[1] || downloadFilename;
+  }
+
+  async _exportAndDownload(filename, content) {
+    const response = await fetch("/claude/api/export-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        filename,
+        content,
+        conversationId: this.currentConversationId,
+        sourceFilename: this._guessSourceFilename(filename),
+      }),
+    });
+
+    if (!response.ok) {
+      let message = "Error al generar el archivo";
+      try {
+        const data = await response.json();
+        message = data.error || message;
+      } catch {
+        // ignore
+      }
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+    const downloadName = match ? decodeURIComponent(match[1].replace(/"/g, "")) : filename;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = downloadName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  _triggerDownload(filename, content, mime) {
+    const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ---- Drag & Drop ----
+
+  setupDropZone() {
+    if (!this.dropOverlay || !this.dropZoneChat || !this.dropZoneExtract) return;
+
+    const main = this.dropOverlay.closest(".claude-main");
+    if (!main) return;
+
+    const hasFiles = (e) => e.dataTransfer?.types?.includes("Files");
+
+    // Show overlay when dragging files into the main area
+    main.addEventListener("dragenter", (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      this._showDropOverlay();
+    });
+
+    main.addEventListener("dragover", (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    });
+
+    // Drop anywhere on the overlay background → attach to chat
+    this.dropOverlay.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+    this.dropOverlay.addEventListener("drop", (e) => {
+      e.preventDefault();
+      this._hideDropOverlay();
+      const files = e.dataTransfer?.files;
+      if (files?.length) this.handleFiles(files);
+    });
+
+    // Hide overlay when leaving the main area entirely
+    this.dropOverlay.addEventListener("dragleave", (e) => {
+      if (!this.dropOverlay.contains(e.relatedTarget)) {
+        this._hideDropOverlay();
+      }
+    });
+
+    // Zone: attach to chat
+    this.dropZoneChat.addEventListener("dragenter", (e) => { e.preventDefault(); this.dropZoneChat.classList.add("is-active"); });
+    this.dropZoneChat.addEventListener("dragleave", () => this.dropZoneChat.classList.remove("is-active"));
+    this.dropZoneChat.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+    this.dropZoneChat.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.dropZoneChat.classList.remove("is-active");
+      this._hideDropOverlay();
+      const files = e.dataTransfer?.files;
+      if (files?.length) this.handleFiles(files);
+    });
+
+    // Zone: extract data
+    this.dropZoneExtract.addEventListener("dragenter", (e) => { e.preventDefault(); this.dropZoneExtract.classList.add("is-active"); });
+    this.dropZoneExtract.addEventListener("dragleave", () => this.dropZoneExtract.classList.remove("is-active"));
+    this.dropZoneExtract.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+    this.dropZoneExtract.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.dropZoneExtract.classList.remove("is-active");
+      this._hideDropOverlay();
+      const file = e.dataTransfer?.files?.[0];
+      if (file) this.extractPdf(file);
+    });
+  }
+
+  _showDropOverlay() {
+    if (!this.dropOverlay) return;
+    this.dropOverlay.hidden = false;
+    this.dropOverlay.removeAttribute("aria-hidden");
+  }
+
+  _hideDropOverlay() {
+    if (!this.dropOverlay) return;
+    this.dropOverlay.hidden = true;
+    this.dropOverlay.setAttribute("aria-hidden", "true");
+    this.dropZoneChat?.classList.remove("is-active");
+    this.dropZoneExtract?.classList.remove("is-active");
   }
 }
 

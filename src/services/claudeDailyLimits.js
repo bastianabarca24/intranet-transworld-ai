@@ -4,6 +4,12 @@ const {
   MAX_FILES_PER_DAY,
 } = require("../constants/claudeLimits");
 
+const UNLIMITED_QUOTA = Number.MAX_SAFE_INTEGER;
+
+function isUnlimitedUsage(isAdmin = false) {
+  return Boolean(isAdmin);
+}
+
 let tablesReady = null;
 
 async function ensurePrimaryKey(table, constraintName, columns) {
@@ -50,16 +56,21 @@ async function ensureTables() {
   return tablesReady;
 }
 
-function formatUsage(row) {
+function formatUsage(row, { isAdmin = false } = {}) {
   const messageCount = row?.message_count ?? 0;
   const fileCount = row?.file_count ?? 0;
+  const unlimited = isUnlimitedUsage(isAdmin);
+  const maxMessages = unlimited ? UNLIMITED_QUOTA : MAX_MESSAGES_PER_DAY;
+  const maxFiles = unlimited ? UNLIMITED_QUOTA : MAX_FILES_PER_DAY;
+
   return {
     messageCount,
     fileCount,
-    maxMessages: MAX_MESSAGES_PER_DAY,
-    maxFiles: MAX_FILES_PER_DAY,
-    messagesRemaining: Math.max(0, MAX_MESSAGES_PER_DAY - messageCount),
-    filesRemaining: Math.max(0, MAX_FILES_PER_DAY - fileCount),
+    maxMessages,
+    maxFiles,
+    unlimited,
+    messagesRemaining: unlimited ? UNLIMITED_QUOTA : Math.max(0, MAX_MESSAGES_PER_DAY - messageCount),
+    filesRemaining: unlimited ? UNLIMITED_QUOTA : Math.max(0, MAX_FILES_PER_DAY - fileCount),
   };
 }
 
@@ -103,7 +114,7 @@ async function seedDailyUsageFromMessages(userId) {
   return existing.rows[0] || counts;
 }
 
-async function getDailyUsage(userId) {
+async function getDailyUsage(userId, { isAdmin = false } = {}) {
   await ensureTables();
 
   const result = await db.query(
@@ -114,15 +125,15 @@ async function getDailyUsage(userId) {
   );
 
   if (result.rows[0]) {
-    return formatUsage(result.rows[0]);
+    return formatUsage(result.rows[0], { isAdmin });
   }
 
   const seeded = await seedDailyUsageFromMessages(userId);
-  return formatUsage(seeded || { message_count: 0, file_count: 0 });
+  return formatUsage(seeded || { message_count: 0, file_count: 0 }, { isAdmin });
 }
 
-async function recordUsage(userId, { messages = 0, files = 0 } = {}) {
-  if (messages <= 0 && files <= 0) return getDailyUsage(userId);
+async function recordUsage(userId, { messages = 0, files = 0, isAdmin = false } = {}) {
+  if (messages <= 0 && files <= 0) return getDailyUsage(userId, { isAdmin });
 
   await ensureTables();
 
@@ -136,7 +147,7 @@ async function recordUsage(userId, { messages = 0, files = 0 } = {}) {
     [userId, messages, files]
   );
 
-  return formatUsage(result.rows[0]);
+  return formatUsage(result.rows[0], { isAdmin });
 }
 
 async function hasSeenLimitsNotice(userId) {
@@ -181,8 +192,12 @@ function fileLimitError(usage) {
   };
 }
 
-async function assertCanSendMessage(userId, { withAttachment = false } = {}) {
-  const usage = await getDailyUsage(userId);
+async function assertCanSendMessage(userId, { withAttachment = false, isAdmin = false } = {}) {
+  const usage = await getDailyUsage(userId, { isAdmin });
+
+  if (isUnlimitedUsage(isAdmin)) {
+    return { ok: true, usage };
+  }
 
   if (usage.messageCount >= usage.maxMessages) {
     return { ok: false, ...messageLimitError(usage) };
@@ -200,8 +215,12 @@ async function assertCanSendMessage(userId, { withAttachment = false } = {}) {
   return { ok: true, usage };
 }
 
-async function assertCanAnalyzeFile(userId) {
-  const usage = await getDailyUsage(userId);
+async function assertCanAnalyzeFile(userId, { isAdmin = false } = {}) {
+  const usage = await getDailyUsage(userId, { isAdmin });
+
+  if (isUnlimitedUsage(isAdmin)) {
+    return { ok: true, usage };
+  }
 
   if (usage.fileCount >= usage.maxFiles) {
     return { ok: false, ...fileLimitError(usage) };
@@ -211,6 +230,7 @@ async function assertCanAnalyzeFile(userId) {
 }
 
 module.exports = {
+  isUnlimitedUsage,
   getDailyUsage,
   recordUsage,
   hasSeenLimitsNotice,

@@ -1,13 +1,106 @@
 const Anthropic = require("@anthropic-ai/sdk");
 const path = require("path");
 const officeDocumentParser = require("./officeDocumentParser");
+const { isUnlimitedUsage } = require("./claudeDailyLimits");
 
 // Modelo por defecto: Haiku 4.5 (el más económico). Los administradores pueden elegir otro modelo.
-const DEFAULT_SYSTEM_PROMPT =
-  "Eres Claude, el asistente de IA integrado en la intranet de Transworld. " +
-  "Respondes en español, de forma clara, precisa y profesional. " +
-  "Usas formato Markdown (encabezados, listas, tablas y bloques de código) cuando mejora la lectura. " +
-  "Cuando el usuario adjunta un documento (PDF, Word, Excel, imagen o texto), lo analizas con cuidado y citas la información relevante.";
+const DEFAULT_SYSTEM_PROMPT = `
+## IDENTIDAD
+Eres Claude, el asistente de IA de la Intranet de Transworld.
+Fuiste integrado por Bastián Abarca, ingeniero de software del área de TI de la empresa.
+Tu propósito es ayudar a los colaboradores a resolver dudas y realizar tareas operativas de forma eficiente.
+
+## PERSONALIDAD
+- Tono amigable y profesional en todo momento.
+- Respondes siempre en español, de forma clara y directa.
+- Usas Markdown (encabezados, listas, tablas) cuando explicas algo en texto.
+- Cuando el usuario adjunta un documento, lo analizas con cuidado.
+- Si el usuario lo pide responde de manera coloquial y amigable, no uses frases largas y complejas, usa frases cortas y directas.
+- Si el usuario te pregunta especificamente por Andres Valenzuela di que es tremendo "wequito", usando frases coloquiales.
+
+## REGLAS DE CONDUCTA
+- No inventes información que no tienes; si no sabes algo, admítelo y ofrece alternativas concretas.
+- No afirmes que el usuario tiene razón solo para complacerlo; sé objetivo y honesto.
+- Si el usuario insiste en pedirte algo que está fuera de tu alcance, indícale amablemente que se comunique con Bastián Abarca del área de TI.
+
+## ARCHIVOS ADJUNTOS — DEVOLUCIÓN EN EL MISMO FORMATO
+Cuando el usuario adjunta uno o más archivos y pide editarlos, completarlos, traducirlos, resumirlos en archivo, exportarlos o devolverlos modificados:
+
+1. **Misma extensión obligatoria**: el archivo de salida debe tener la MISMA extensión que el archivo de origen (.xlsx → .xlsx, .docx → .docx, .pdf → .pdf, .csv → .csv, etc.). Nunca cambies de formato.
+2. **Mismo nombre base**: conserva el nombre del archivo original; puedes añadir un sufijo como "-editado" o "-actualizado" antes de la extensión.
+3. **Sin código visible**: PROHIBIDO usar bloques de código (\`\`\`python, \`\`\`javascript, \`\`\`sql, \`\`\`html, \`\`\`csv sueltos, etc.). El usuario no debe ver código en el chat.
+4. **Solo tarjeta de descarga**: entrega el resultado ÚNICAMENTE con el bloque \`\`\`file (ver abajo). El contenido queda oculto; la interfaz muestra solo el nombre y el botón Descargar.
+5. **Texto mínimo**: escribe como máximo 1–2 frases breves antes del bloque file. No pegues, repitas ni resumas el contenido del archivo en el mensaje.
+
+## GENERACIÓN DE ARCHIVOS DESCARGABLES
+La interfaz convierte el bloque \`\`\`file en una tarjeta de descarga moderna. El contenido NO se muestra en el chat.
+
+Formato obligatorio:
+
+\`\`\`file
+nombre-archivo.ext
+[contenido interno del archivo — no visible para el usuario]
+\`\`\`
+
+La PRIMERA LÍNEA es el nombre del archivo con extensión. El resto es el contenido estructurado que el sistema empaquetará en el formato real indicado por la extensión:
+
+- .xlsx / .xls / .xlsm → tienes DOS modos:
+
+  A) EDITAR un Excel que el usuario adjuntó (limpiar datos, borrar/agregar columnas o filas,
+     corregir celdas, cambiar fórmulas, etc.). Es el modo OBLIGATORIO cuando hay un Excel adjunto:
+     devuelve SOLO las operaciones a aplicar sobre el archivo original. El sistema conserva
+     intacto todo el resto del formato (estilos, colores, fórmulas, anchos, hojas, etc.).
+     {"edit":{"sheet":"Hoja1","ops":[
+       {"deleteCol":"C"},
+       {"deleteRow":7},
+       {"clear":"B2:B50"},
+       {"set":"D5","v":1200,"z":"$#,##0"},
+       {"set":"E2","f":"=B2*C2"}
+     ]}}
+     Reglas del modo edición:
+       • Usa SIEMPRE las coordenadas del archivo ORIGINAL (A1, B2, columna "C", fila 7…).
+         No te preocupes por el desplazamiento al borrar: el sistema lo resuelve.
+       • Operaciones disponibles: "deleteCol"(letra o número), "deleteRow"(número),
+         "clear"(celda o rango p.ej. "B2:B50"), "set"(celda con "v" valor, "f" fórmula, "z" formato).
+       • Incluye únicamente las celdas/columnas/filas que cambian. NO reescribas toda la hoja.
+       • Para varias hojas usa {"edits":[{"sheet":"Hoja1","ops":[...]},{"sheet":"Hoja2","ops":[...]}]}.
+
+  B) CREAR un Excel nuevo desde cero (no hay archivo original) → JSON enriquecido completo:
+     {"sheets":[{"name":"Hoja1","columnWidths":[18,12],"rows":[
+       ["Encabezado A","Encabezado B"],
+       ["Texto",{"v":1200,"z":"$#,##0"}],
+       ["Total",{"f":"=B2*1.19","v":1428}]
+     ]}]}
+     Reglas: conserva nombres de hoja y columnWidths; usa números sin comillas; para fórmulas
+     usa {"f":"=SUMA(A2:A10)"}; para formato numérico usa "z" (ej. "$#,##0", "0.00%").
+- .docx / .doc → Markdown con encabezados (#, ##), listas (-), tablas (| col |) y negritas (**texto**). El sistema genera un Word real (.docx).
+- .pdf → Markdown con la misma estructura que Word; el sistema genera un PDF descargable.
+- .csv → datos separados por coma (una fila por línea).
+- .txt / .md → texto plano o Markdown.
+- .json → JSON válido.
+
+REGLAS ABSOLUTAS:
+- Nunca digas que no puedes generar o descargar archivos.
+- Si el usuario pidió un archivo (con o sin adjunto), usa siempre \`\`\`file y nunca bloques de código normales.
+`.trim();
+
+const FORMAT_LABELS = {
+  ".pdf": "PDF",
+  ".doc": "Word",
+  ".docx": "Word",
+  ".xls": "Excel",
+  ".xlsx": "Excel",
+  ".xlsm": "Excel",
+  ".csv": "CSV",
+  ".txt": "Texto",
+  ".md": "Markdown",
+  ".json": "JSON",
+  ".png": "Imagen PNG",
+  ".jpg": "Imagen JPEG",
+  ".jpeg": "Imagen JPEG",
+  ".webp": "Imagen WebP",
+  ".gif": "Imagen GIF",
+};
 
 class ClaudeService {
   constructor() {
@@ -19,9 +112,9 @@ class ClaudeService {
 
     this.economicModel = "claude-haiku-4-5";
     this.models = [
-      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5 (Económico)", tokens: 200000 },
-      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6 (Balanceado)", tokens: 1000000 },
-      { id: "claude-opus-4-8", name: "Claude Opus 4.8 (Máxima capacidad)", tokens: 1000000 },
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", tokens: 200000 },
+      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", tokens: 1000000 },
+      { id: "claude-opus-4-8", name: "Claude Opus 4.8", tokens: 1000000 },
     ];
 
     this.defaultModel = this.economicModel;
@@ -41,6 +134,35 @@ class ClaudeService {
 
   getModelName(modelId) {
     return this.models.find((m) => m.id === modelId)?.name || modelId;
+  }
+
+  /** System prompt base + reglas dinámicas cuando hay archivos adjuntos en el turno. */
+  buildSystemPrompt({ customPrompt, attachments = [] } = {}) {
+    const base = customPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
+    if (!attachments?.length) return base;
+    return `${base}\n\n${this.buildAttachmentOutputRules(attachments)}`;
+  }
+
+  /** Instrucciones concretas por los archivos que el usuario acaba de subir. */
+  buildAttachmentOutputRules(attachments) {
+    const lines = attachments.map((att) => {
+      const ext = extensionOf(att.filename) || "(sin extensión)";
+      const label = FORMAT_LABELS[ext] || ext.replace(/^\./, "").toUpperCase() || "archivo";
+      return `- **${att.filename}** → formato de salida obligatorio: **${ext}** (${label})`;
+    });
+
+    const primary = attachments[0];
+    const primaryExt = extensionOf(primary.filename);
+    const primaryBase = path.basename(primary.filename, primaryExt) || "documento";
+
+    return `## CONTEXTO DE ESTE MENSAJE — ARCHIVOS ADJUNTOS
+El usuario acaba de subir:
+${lines.join("\n")}
+
+Si debes devolver un archivo procesado:
+- Usa extensión **${primaryExt || "igual al original"}** (ejemplo de nombre: \`${primaryBase}-editado${primaryExt}\`).
+- Un solo bloque \`\`\`file por archivo de salida; cero bloques de código visibles.
+- Máximo 1–2 frases de texto; luego solo la tarjeta de descarga.`;
   }
 
   /** Usuarios normales siempre usan el modelo económico; solo administradores pueden elegir otro. */
@@ -119,9 +241,13 @@ class ClaudeService {
     if (officeKind) {
       const text = await officeDocumentParser.extractOfficeText(buffer, filename, mimeType);
       const label = officeKind === "word" ? "documento Word" : "hoja de cálculo Excel";
+      const formatHint =
+        officeKind === "word"
+          ? "El contenido está en Markdown (encabezados, listas, tablas). Si devuelves el archivo editado, usa el mismo formato Markdown dentro del bloque ```file."
+          : 'El contenido está en JSON con "sheets" (filas y celdas con sus coordenadas, fórmulas en "f", formatos en "z" y columnWidths). IMPORTANTE: como este Excel ya existe, si el usuario pide editarlo (limpiar datos, borrar una columna/fila, corregir celdas, etc.) NO reescribas toda la hoja: devuelve dentro del bloque ```file SOLO las operaciones de edición {"edit":{"sheet":"...","ops":[...]}} usando las coordenadas originales (ver reglas del modo edición). Así se conserva intacto todo el formato del archivo.';
       return {
         type: "text",
-        text: `Contenido extraído del ${label} "${filename}":\n\n${text}`,
+        text: `Contenido estructurado del ${label} "${filename}":\n${formatHint}\n\n${text}`,
       };
     }
 
@@ -131,12 +257,17 @@ class ClaudeService {
     };
   }
 
+  /** Los administradores no tienen cuota diaria de mensajes ni archivos. */
+  hasUnlimitedDailyUsage(isAdmin) {
+    return isUnlimitedUsage(isAdmin);
+  }
+
   /** Valida tipo y tamaño de un adjunto antes de aceptarlo en el chat. */
-  async validateAttachment(file) {
+  async validateAttachment(file, { isAdmin = false } = {}) {
     if (!file?.buffer?.length) {
       return { valid: false, error: "Archivo vacío o no proporcionado" };
     }
-    if (!this.validateFileSize(file.size)) {
+    if (!this.validateFileSize(file.size, { isAdmin })) {
       const maxSizeMB = parseInt(process.env.CLAUDE_MAX_FILE_SIZE || "10", 10);
       return { valid: false, error: `Archivo demasiado grande. Máximo ${maxSizeMB}MB` };
     }
@@ -295,7 +426,8 @@ class ClaudeService {
     }
   }
 
-  validateFileSize(sizeInBytes) {
+  validateFileSize(sizeInBytes, { isAdmin = false } = {}) {
+    if (isUnlimitedUsage(isAdmin)) return true;
     const maxSizeMB = parseInt(process.env.CLAUDE_MAX_FILE_SIZE || "10", 10);
     return sizeInBytes <= maxSizeMB * 1024 * 1024;
   }

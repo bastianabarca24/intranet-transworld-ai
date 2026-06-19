@@ -1,8 +1,11 @@
 const express = require("express");
 const crypto = require("crypto");
+const path = require("path");
 const multer = require("multer");
 const db = require("../db");
 const claudeService = require("../services/claudeService");
+const officeDocumentBuilder = require("../services/officeDocumentBuilder");
+const officeExcelFormat = require("../services/officeExcelFormat");
 const {
   getDailyUsage,
   recordUsage,
@@ -11,6 +14,7 @@ const {
   assertCanSendMessage,
   assertCanAnalyzeFile,
 } = require("../services/claudeDailyLimits");
+const { attachClaudeUsageContext } = require("../middlewares/claudeLimits");
 const {
   MAX_MESSAGES_PER_DAY,
   MAX_FILES_PER_DAY,
@@ -22,18 +26,6 @@ const { isAdministrador } = require("../constants/roles");
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Almacén temporal en memoria para adjuntos pendientes de enviar al chat.
-// Evita transportar PDFs en base64 dentro del cuerpo JSON del chat.
-const pendingAttachments = new Map(); // id -> { buffer, mimeType, filename, userId, expires }
-const ATTACHMENT_TTL_MS = 15 * 60 * 1000;
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, att] of pendingAttachments) {
-    if (att.expires < now) pendingAttachments.delete(id);
-  }
-}, 60 * 1000).unref?.();
-
 // Middleware: Verificar autenticación
 const requireAuth = (req, res, next) => {
   if (!req.session || !req.session.user) {
@@ -42,15 +34,86 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
+router.use(requireAuth);
+router.use(attachClaudeUsageContext);
+
+// Almacén temporal en memoria para adjuntos pendientes de enviar al chat.
+// Evita transportar PDFs en base64 dentro del cuerpo JSON del chat.
+const pendingAttachments = new Map(); // id -> { buffer, mimeType, filename, userId, expires }
+const ATTACHMENT_TTL_MS = 15 * 60 * 1000;
+const exportTemplates = new Map(); // key -> { buffer, filename, userId, conversationId, expires }
+const EXPORT_TEMPLATE_TTL_MS = 2 * 60 * 60 * 1000;
+
+function templateKey(userId, conversationId, filename) {
+  return `${userId}:${conversationId}:${filename}`;
+}
+
+function storeExportTemplate({ userId, conversationId, buffer, filename }) {
+  if (!buffer?.length || !conversationId || !filename) return;
+  exportTemplates.set(templateKey(userId, conversationId, filename), {
+    buffer,
+    filename,
+    userId,
+    conversationId,
+    expires: Date.now() + EXPORT_TEMPLATE_TTL_MS,
+  });
+}
+
+function resolveExportTemplate({ userId, conversationId, filename }) {
+  if (!conversationId || !filename) return null;
+  const candidates = new Set([filename]);
+  const ext = path.extname(filename);
+  const base = path.basename(filename, ext);
+  const normalizedBase = base.replace(/-(editado|actualizado|modificado|final)$/i, "");
+  if (normalizedBase !== base) {
+    candidates.add(`${normalizedBase}${ext}`);
+  }
+
+  for (const candidate of candidates) {
+    const entry = exportTemplates.get(templateKey(userId, conversationId, candidate));
+    if (!entry) continue;
+    if (entry.expires < Date.now()) {
+      exportTemplates.delete(templateKey(userId, conversationId, candidate));
+      continue;
+    }
+    if (entry.userId !== userId) continue;
+    return entry;
+  }
+
+  for (const [key, entry] of exportTemplates) {
+    if (entry.userId !== userId || entry.conversationId !== conversationId) continue;
+    if (entry.expires < Date.now()) {
+      exportTemplates.delete(key);
+      continue;
+    }
+    if (officeExcelFormat.isExcelFile(entry.filename)) {
+      return entry;
+    }
+  }
+
+  return null;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, att] of pendingAttachments) {
+    if (att.expires < now) pendingAttachments.delete(id);
+  }
+  for (const [key, entry] of exportTemplates) {
+    if (entry.expires < now) exportTemplates.delete(key);
+  }
+}, 60 * 1000).unref?.();
+
 const userIsAdmin = (req) => isAdministrador(req.session.user?.role);
+const unlimitedUsage = (req) => Boolean(req.claudeUnlimitedUsage);
 
 // GET /claude - Abrir asistente como modal en la intranet
-router.get("/", requireAuth, (req, res) => {
+router.get("/", (req, res) => {
   res.redirect("/?openClaude=1");
 });
 
 // GET /claude/api/bootstrap - Datos iniciales para el modal
-router.get("/api/bootstrap", requireAuth, async (req, res) => {
+router.get("/api/bootstrap", async (req, res) => {
   try {
     const conversations = await db.query(
       "SELECT id, title, created_at FROM claude_conversations WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 50",
@@ -58,13 +121,14 @@ router.get("/api/bootstrap", requireAuth, async (req, res) => {
     );
 
     const canChangeModel = userIsAdmin(req);
+    const isUnlimited = unlimitedUsage(req);
     const defaultModel = canChangeModel
       ? claudeService.getDefaultModel()
       : claudeService.getEconomicModel();
 
     const userId = req.session.user.id;
-    const dailyUsage = await getDailyUsage(userId);
-    const limitsNoticeSeen = await hasSeenLimitsNotice(userId);
+    const dailyUsage = await getDailyUsage(userId, { isAdmin: isUnlimited });
+    const limitsNoticeSeen = isUnlimited ? true : await hasSeenLimitsNotice(userId);
 
     res.json({
       conversations: conversations.rows,
@@ -75,11 +139,13 @@ router.get("/api/bootstrap", requireAuth, async (req, res) => {
       userId,
       dailyUsage,
       limitsNoticeSeen,
-      limits: {
-        maxMessages: MAX_MESSAGES_PER_DAY,
-        maxFiles: MAX_FILES_PER_DAY,
-        notice: LIMITS_NOTICE,
-      },
+      limits: isUnlimited
+        ? { unlimited: true }
+        : {
+            maxMessages: MAX_MESSAGES_PER_DAY,
+            maxFiles: MAX_FILES_PER_DAY,
+            notice: LIMITS_NOTICE,
+          },
     });
   } catch (error) {
     console.error("[Claude Bootstrap] Error:", error);
@@ -88,7 +154,7 @@ router.get("/api/bootstrap", requireAuth, async (req, res) => {
 });
 
 // GET /api/claude/models - Listar modelos
-router.get("/api/models", requireAuth, (req, res) => {
+router.get("/api/models", (req, res) => {
   if (!userIsAdmin(req)) {
     const economicModel = claudeService.getEconomicModel();
     return res.json([
@@ -103,11 +169,12 @@ router.get("/api/models", requireAuth, (req, res) => {
 });
 
 // GET /claude/api/usage - Uso diario actual (refresco al reabrir el asistente)
-router.get("/api/usage", requireAuth, async (req, res) => {
+router.get("/api/usage", async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const dailyUsage = await getDailyUsage(userId);
-    const limitsNoticeSeen = await hasSeenLimitsNotice(userId);
+    const isUnlimited = unlimitedUsage(req);
+    const dailyUsage = await getDailyUsage(userId, { isAdmin: isUnlimited });
+    const limitsNoticeSeen = isUnlimited ? true : await hasSeenLimitsNotice(userId);
     res.json({ dailyUsage, limitsNoticeSeen, userId });
   } catch (error) {
     console.error("[Claude Usage] Error:", error);
@@ -116,7 +183,7 @@ router.get("/api/usage", requireAuth, async (req, res) => {
 });
 
 // POST /claude/api/limits-notice-seen - Marcar aviso de marcha blanca como visto
-router.post("/api/limits-notice-seen", requireAuth, async (req, res) => {
+router.post("/api/limits-notice-seen", async (req, res) => {
   try {
     const userId = req.session.user.id;
     await markLimitsNoticeSeen(userId);
@@ -147,18 +214,19 @@ async function resolveConversationId({ conversationId, userId }) {
 }
 
 // POST /api/claude/upload - Subir un adjunto para usar en el chat
-router.post("/api/upload", requireAuth, upload.single("file"), async (req, res) => {
+router.post("/api/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No se proporcionó archivo" });
     }
-    const validation = await claudeService.validateAttachment(req.file);
+    const isUnlimited = unlimitedUsage(req);
+    const validation = await claudeService.validateAttachment(req.file, { isAdmin: isUnlimited });
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
     }
 
     const userId = req.session.user.id;
-    const fileCheck = await assertCanAnalyzeFile(userId);
+    const fileCheck = await assertCanAnalyzeFile(userId, { isAdmin: isUnlimited });
     if (!fileCheck.ok) {
       return res.status(fileCheck.status).json({
         error: fileCheck.error,
@@ -189,11 +257,19 @@ router.post("/api/upload", requireAuth, upload.single("file"), async (req, res) 
 });
 
 // POST /api/claude/chat - Enviar mensaje (respuesta en streaming SSE)
-router.post("/api/chat", requireAuth, async (req, res) => {
-  const { conversationId, message, model, systemPrompt, attachmentId } = req.body;
+router.post("/api/chat", async (req, res) => {
+  const { conversationId, message, model, systemPrompt, attachmentId, attachmentIds } = req.body;
   const userId = req.session.user.id;
+  const isUnlimited = unlimitedUsage(req);
 
-  if ((!message || !message.trim()) && !attachmentId) {
+  // Soporta tanto un ID único (legacy) como un array de IDs
+  const ids = Array.isArray(attachmentIds)
+    ? attachmentIds
+    : attachmentId
+    ? [attachmentId]
+    : [];
+
+  if ((!message || !message.trim()) && !ids.length) {
     return res.status(400).json({ error: "Mensaje requerido" });
   }
   const selectedModel = claudeService.resolveModel(model, userIsAdmin(req));
@@ -210,7 +286,6 @@ router.post("/api/chat", requireAuth, async (req, res) => {
       );
       convId = result.rows[0].id;
     } else {
-      // Verificar propiedad
       const conv = await db.query(
         "SELECT user_id FROM claude_conversations WHERE id = $1",
         [convId]
@@ -220,7 +295,10 @@ router.post("/api/chat", requireAuth, async (req, res) => {
       }
     }
 
-    const limitCheck = await assertCanSendMessage(userId, { withAttachment: Boolean(attachmentId) });
+    const limitCheck = await assertCanSendMessage(userId, {
+      withAttachment: ids.length > 0,
+      isAdmin: isUnlimited,
+    });
     if (!limitCheck.ok) {
       return res.status(limitCheck.status).json({
         error: limitCheck.error,
@@ -229,28 +307,40 @@ router.post("/api/chat", requireAuth, async (req, res) => {
       });
     }
 
-    // Recuperar adjunto pendiente (si lo hay) antes de modificar la BD
-    let attachment = null;
-    if (attachmentId) {
-      const att = pendingAttachments.get(attachmentId);
+    // Recuperar adjuntos pendientes antes de modificar la BD
+    const attachments = [];
+    for (const id of ids) {
+      const att = pendingAttachments.get(id);
       if (att && att.userId === userId) {
-        attachment = att;
-        pendingAttachments.delete(attachmentId);
+        attachments.push(att);
+        pendingAttachments.delete(id);
       }
     }
 
-    if (attachment) {
-      const fileCheck = await assertCanAnalyzeFile(userId);
-      if (!fileCheck.ok) {
-        return res.status(fileCheck.status).json({
-          error: fileCheck.error,
-          code: fileCheck.code,
-          usage: fileCheck.usage,
+    for (const att of attachments) {
+      if (officeExcelFormat.isExcelFile(att.filename)) {
+        storeExportTemplate({
+          userId,
+          conversationId: convId,
+          buffer: att.buffer,
+          filename: att.filename,
         });
       }
     }
 
-    // Historial previo (texto plano) para contexto — ventana de 20 mensajes
+    // Verificar cuota para todos los archivos de este envío
+    if (attachments.length > 0 && !isUnlimited) {
+      const usage = await getDailyUsage(userId, { isAdmin: false });
+      if (usage.fileCount + attachments.length > usage.maxFiles) {
+        return res.status(429).json({
+          error: `Alcanzaste el límite diario de ${usage.maxFiles} archivos analizados. Podrás usar el asistente nuevamente mañana.`,
+          code: "FILE_LIMIT",
+          usage,
+        });
+      }
+    }
+
+    // Historial previo para contexto — ventana de mensajes
     const history = await db.query(
       `SELECT role, content FROM (
          SELECT role, content, created_at
@@ -263,22 +353,25 @@ router.post("/api/chat", requireAuth, async (req, res) => {
     );
     const messages = history.rows.map((row) => ({ role: row.role, content: row.content }));
 
-    // Construir el turno actual del usuario (con adjunto si aplica)
+    // Construir el turno del usuario (con adjuntos si aplica)
     const userText = (message || "").trim();
     let currentContent;
-    if (attachment) {
+    if (attachments.length > 0) {
+      const blocks = await Promise.all(
+        attachments.map((att) => claudeService.buildAttachmentBlock(att))
+      );
       currentContent = [
-        await claudeService.buildAttachmentBlock(attachment),
-        { type: "text", text: userText || "Analiza el documento adjunto." },
+        ...blocks,
+        { type: "text", text: userText || "Analiza los documentos adjuntos." },
       ];
     } else {
       currentContent = userText;
     }
     messages.push({ role: "user", content: currentContent });
 
-    // Guardar mensaje del usuario (texto + nota de adjunto)
-    const storedUserText =
-      (attachment ? `📎 ${attachment.filename}\n\n` : "") + userText;
+    // Guardar mensaje del usuario (texto + lista de adjuntos)
+    const attachmentPrefix = attachments.map((a) => `📎 ${a.filename}`).join("\n");
+    const storedUserText = (attachmentPrefix ? `${attachmentPrefix}\n\n` : "") + userText;
     await db.query(
       "INSERT INTO claude_messages (conversation_id, role, content, created_at) VALUES ($1, $2, $3, NOW())",
       [convId, "user", storedUserText]
@@ -292,7 +385,7 @@ router.post("/api/chat", requireAuth, async (req, res) => {
       "X-Accel-Buffering": "no",
     });
     const sse = (payload) => res.write(`data: ${JSON.stringify(payload)}\n\n`);
-    const provisionalTitle = claudeService.provisionalTitle(userText, attachment?.filename);
+    const provisionalTitle = claudeService.provisionalTitle(userText, attachments[0]?.filename);
     sse({
       type: "meta",
       conversationId: convId,
@@ -307,9 +400,14 @@ router.post("/api/chat", requireAuth, async (req, res) => {
       ]);
     }
 
+    const system = claudeService.buildSystemPrompt({
+      customPrompt: systemPrompt,
+      attachments,
+    });
+
     let fullText = "";
     const final = await claudeService.streamMessage(messages, selectedModel, {
-      system: systemPrompt,
+      system,
       onEvent: (ev) => {
         if (ev.type === "text") fullText += ev.text;
         sse(ev);
@@ -325,18 +423,19 @@ router.post("/api/chat", requireAuth, async (req, res) => {
     }
     await db.query("UPDATE claude_conversations SET updated_at = NOW() WHERE id = $1", [convId]);
 
-    const filesUsed = attachment ? 1 : 0;
+    const filesUsed = attachments.length;
     const messagesUsed = fullText.trim() ? 2 : 1;
     const dailyUsage = await recordUsage(userId, {
       messages: messagesUsed,
       files: filesUsed,
+      isAdmin: isUnlimited,
     });
 
     if (isNewConversation) {
       const generatedTitle = await claudeService.generateConversationTitle({
         userText,
         assistantText: fullText,
-        attachmentName: attachment?.filename,
+        attachmentName: attachments[0]?.filename,
       });
       await db.query("UPDATE claude_conversations SET title = $1 WHERE id = $2", [
         generatedTitle,
@@ -349,7 +448,6 @@ router.post("/api/chat", requireAuth, async (req, res) => {
     res.end();
   } catch (error) {
     console.error("[Claude Chat] Error:", error);
-    // Si aún no se enviaron cabeceras, responder JSON; si no, emitir error por SSE
     if (!res.headersSent) {
       return res.status(500).json({ error: "Error al procesar el mensaje: " + error.message });
     }
@@ -359,12 +457,13 @@ router.post("/api/chat", requireAuth, async (req, res) => {
 });
 
 // POST /api/claude/extract - Extracción estructurada de un documento
-router.post("/api/extract", requireAuth, upload.single("file"), async (req, res) => {
+router.post("/api/extract", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No se proporcionó archivo" });
     }
-    const validation = await claudeService.validateAttachment(req.file);
+    const isUnlimited = unlimitedUsage(req);
+    const validation = await claudeService.validateAttachment(req.file, { isAdmin: isUnlimited });
     if (!validation.valid) {
       return res.status(400).json({ error: validation.error });
     }
@@ -379,7 +478,10 @@ router.post("/api/extract", requireAuth, upload.single("file"), async (req, res)
     }
     const convId = resolved.conversationId;
 
-    const limitCheck = await assertCanSendMessage(userId, { withAttachment: true });
+    const limitCheck = await assertCanSendMessage(userId, {
+      withAttachment: true,
+      isAdmin: isUnlimited,
+    });
     if (!limitCheck.ok) {
       return res.status(limitCheck.status).json({
         error: limitCheck.error,
@@ -412,7 +514,11 @@ router.post("/api/extract", requireAuth, upload.single("file"), async (req, res)
     );
     await db.query("UPDATE claude_conversations SET updated_at = NOW() WHERE id = $1", [convId]);
 
-    const dailyUsage = await recordUsage(userId, { messages: 2, files: 1 });
+    const dailyUsage = await recordUsage(userId, {
+      messages: 2,
+      files: 1,
+      isAdmin: isUnlimited,
+    });
 
     res.json({
       conversationId: convId,
@@ -429,7 +535,7 @@ router.post("/api/extract", requireAuth, upload.single("file"), async (req, res)
 });
 
 // GET /api/claude/history/:conversationId - Obtener historial
-router.get("/api/history/:conversationId", requireAuth, async (req, res) => {
+router.get("/api/history/:conversationId", async (req, res) => {
   try {
     const { conversationId } = req.params;
     const conv = await db.query(
@@ -444,7 +550,9 @@ router.get("/api/history/:conversationId", requireAuth, async (req, res) => {
       "SELECT role, content, created_at FROM claude_messages WHERE conversation_id = $1 ORDER BY created_at ASC",
       [conversationId]
     );
-    const dailyUsage = await getDailyUsage(req.session.user.id);
+    const dailyUsage = await getDailyUsage(req.session.user.id, {
+      isAdmin: unlimitedUsage(req),
+    });
     res.json({ messages: messages.rows, dailyUsage });
   } catch (error) {
     console.error("[Claude History] Error:", error);
@@ -453,7 +561,7 @@ router.get("/api/history/:conversationId", requireAuth, async (req, res) => {
 });
 
 // PATCH /api/claude/conversation/:id - Renombrar conversación
-router.patch("/api/conversation/:id", requireAuth, async (req, res) => {
+router.patch("/api/conversation/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const title = String(req.body?.title || "").trim();
@@ -484,7 +592,7 @@ router.patch("/api/conversation/:id", requireAuth, async (req, res) => {
 });
 
 // DELETE /api/claude/conversation/:id - Eliminar conversación
-router.delete("/api/conversation/:id", requireAuth, async (req, res) => {
+router.delete("/api/conversation/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const conv = await db.query(
@@ -505,7 +613,7 @@ router.delete("/api/conversation/:id", requireAuth, async (req, res) => {
 });
 
 // POST /api/claude/conversation/new - Nueva conversación
-router.post("/api/conversation/new", requireAuth, async (req, res) => {
+router.post("/api/conversation/new", async (req, res) => {
   try {
     const result = await db.query(
       "INSERT INTO claude_conversations (user_id, title, created_at, updated_at) VALUES ($1, $2, NOW(), NOW()) RETURNING id, created_at",
@@ -518,6 +626,46 @@ router.post("/api/conversation/new", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("[Claude New Conv] Error:", error);
     res.status(500).json({ error: "Error al crear conversación" });
+  }
+});
+
+const MAX_EXPORT_CONTENT_CHARS = parseInt(process.env.CLAUDE_MAX_EXPORT_CHARS || "500000", 10);
+
+// POST /api/claude/export-file - Genera un archivo Office/PDF real para descarga
+router.post("/api/export-file", async (req, res) => {
+  try {
+    const filename = String(req.body?.filename || "").trim();
+    const content = String(req.body?.content ?? "");
+    const conversationId = req.body?.conversationId ? String(req.body.conversationId) : null;
+    const sourceFilename = String(req.body?.sourceFilename || filename).trim();
+    const userId = req.session.user.id;
+
+    if (!filename) {
+      return res.status(400).json({ error: "Nombre de archivo requerido" });
+    }
+    if (!content.trim()) {
+      return res.status(400).json({ error: "Contenido del archivo vacío" });
+    }
+    if (content.length > MAX_EXPORT_CONTENT_CHARS) {
+      return res.status(400).json({ error: "El contenido del archivo es demasiado grande" });
+    }
+
+    const template = officeExcelFormat.isExcelFile(filename)
+      ? resolveExportTemplate({ userId, conversationId, filename: sourceFilename })
+      : null;
+
+    const result = await officeDocumentBuilder.buildFromContent(filename, content, {
+      templateBuffer: template?.buffer || null,
+    });
+    res.setHeader("Content-Type", result.mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${encodeURIComponent(result.filename)}"`
+    );
+    res.send(result.buffer);
+  } catch (error) {
+    console.error("[Claude Export] Error:", error);
+    res.status(500).json({ error: error.message || "No se pudo generar el archivo" });
   }
 });
 

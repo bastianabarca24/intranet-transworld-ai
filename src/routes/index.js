@@ -88,6 +88,13 @@ async function updateDataBackground() {
   }
 }
 
+if (process.env.LINKEDIN_CLIENT_ID) {
+  console.log(
+    "[LINKEDIN] OAuth callback:",
+    linkedinService.getRedirectUri(),
+  );
+}
+
 updateDataBackground();
 setInterval(updateDataBackground, 15 * 60 * 1000);
 
@@ -1293,7 +1300,7 @@ router.post(
 // LINKEDIN
 // ==========================================
 router.get("/auth/linkedin/renovar", (req, res) => {
-  res.redirect(linkedinService.getAuthorizationUrl());
+  res.redirect(linkedinService.getAuthorizationUrl(req));
 });
 
 // ==========================================

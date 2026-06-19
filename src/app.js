@@ -35,6 +35,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET?.trim();
 
+if (
+  process.env.NODE_ENV === "production" ||
+  process.env.TRUST_PROXY === "true"
+) {
+  app.set("trust proxy", 1);
+}
+
 if (!SESSION_SECRET) {
   throw new Error("SESSION_SECRET es obligatorio. Configúralo en el archivo .env.");
 }

@@ -1,6 +1,7 @@
 const path = require("path");
+const mammoth = require("mammoth");
 const WordExtractor = require("word-extractor");
-const XLSX = require("xlsx");
+const officeExcelFormat = require("./officeExcelFormat");
 
 const WORD_EXTENSIONS = new Set([".doc", ".docx"]);
 const EXCEL_EXTENSIONS = new Set([".xls", ".xlsx", ".xlsm"]);
@@ -35,7 +36,26 @@ function truncateExtractedText(text, filename) {
   );
 }
 
-async function extractWordText(buffer) {
+async function extractWordText(buffer, filename) {
+  const ext = extensionOf(filename);
+
+  if (ext === ".docx") {
+    const result = await mammoth.convertToMarkdown(
+      { buffer },
+      {
+        styleMap: [
+          "p[style-name='Heading 1'] => # :fresh",
+          "p[style-name='Heading 2'] => ## :fresh",
+          "p[style-name='Heading 3'] => ### :fresh",
+          "b => **",
+          "i => *",
+        ],
+      }
+    );
+    const markdown = result.value?.trim();
+    if (markdown) return markdown;
+  }
+
   const doc = await new WordExtractor().extract(buffer);
   const parts = [
     doc.getBody()?.trim(),
@@ -46,18 +66,10 @@ async function extractWordText(buffer) {
   return parts.join("\n\n");
 }
 
-function extractExcelText(buffer) {
-  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
-  const sections = [];
-
-  for (const sheetName of workbook.SheetNames) {
-    const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName], { blankrows: false });
-    if (csv.trim()) {
-      sections.push(`### Hoja: ${sheetName}\n\n${csv}`);
-    }
-  }
-
-  return sections.join("\n\n") || "(Hoja de cálculo sin datos visibles)";
+function extractExcelStructured(buffer, filename) {
+  return officeExcelFormat.extractWorkbookJson(buffer, filename).then((data) =>
+    JSON.stringify(data, null, 2)
+  );
 }
 
 async function extractOfficeText(buffer, filename, mimeType = "") {
@@ -68,9 +80,9 @@ async function extractOfficeText(buffer, filename, mimeType = "") {
 
   let text;
   if (kind === "word") {
-    text = await extractWordText(buffer);
+    text = await extractWordText(buffer, filename);
   } else {
-    text = extractExcelText(buffer);
+    text = await extractExcelStructured(buffer, filename);
   }
 
   if (!text.trim()) {

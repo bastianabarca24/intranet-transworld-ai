@@ -115,6 +115,10 @@
               </button>
             </div>
 
+            <p class="login-password-caps-hint" id="login-password-caps-hint" hidden role="status">
+              Caps Lock está activado. Desactívalo si no es necesario.
+            </p>
+
             <button type="submit" class="login-split__submit">Ingresar</button>
           </form>
 
@@ -656,6 +660,44 @@
           e.preventDefault();
           passwordInput.focus();
         }
+      });
+    })();
+
+    (function initLoginPasswordCapsHint() {
+      const passwordInput = document.getElementById('login-password');
+      const hint = document.getElementById('login-password-caps-hint');
+      if (!passwordInput || !hint) return;
+
+      let capsLockOn = false;
+
+      function syncCapsState(event) {
+        if (event && typeof event.getModifierState === 'function') {
+          capsLockOn = event.getModifierState('CapsLock');
+        }
+        if (document.activeElement === passwordInput) {
+          updateHint();
+        }
+      }
+
+      function updateHint() {
+        const isFocused = document.activeElement === passwordInput;
+        hint.hidden = !(isFocused && capsLockOn);
+      }
+
+      function onInteraction(event) {
+        syncCapsState(event);
+        updateHint();
+      }
+
+      document.addEventListener('keydown', syncCapsState, true);
+      document.addEventListener('keyup', syncCapsState, true);
+
+      passwordInput.addEventListener('mousedown', onInteraction);
+      passwordInput.addEventListener('keydown', onInteraction);
+      passwordInput.addEventListener('keyup', onInteraction);
+      passwordInput.addEventListener('focus', updateHint);
+      passwordInput.addEventListener('blur', function () {
+        hint.hidden = true;
       });
     })();
 

@@ -37,6 +37,7 @@
 
   function shouldShowLimitsNotice() {
     const config = window.CLAUDE_CONFIG || {};
+    if (config.limits?.unlimited) return false;
     const userId = config.userId;
     if (config.limitsNoticeSeen) return false;
     if (hasSeenLimitsNoticeLocally(userId)) return false;

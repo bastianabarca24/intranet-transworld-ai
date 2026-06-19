@@ -1,25 +1,85 @@
 const axios = require("axios");
 const db = require("../db");
 const qs = require("querystring");
+const fileStorage = require("./fileStorage");
 
 const CLIENT_ID = process.env.LINKEDIN_CLIENT_ID;
 const CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET;
 const ORG_ID = process.env.LINKEDIN_ORG_ID;
+const LINKEDIN_IMAGES_FOLDER = "linkedin_posts";
+const FALLBACK_IMAGE = "/img/fondo-home.png";
+const LINKEDIN_API_VERSION =
+  process.env.LINKEDIN_API_VERSION?.trim() || "202601";
 
-function getRedirectUri() {
-  if (process.env.LINKEDIN_CALLBACK_URL?.trim()) {
-    return process.env.LINKEDIN_CALLBACK_URL.trim();
+function stripTrailingSlash(value) {
+  return String(value || "").replace(/\/$/, "");
+}
+
+function resolveBaseUrl(req) {
+  const callbackUrl = process.env.LINKEDIN_CALLBACK_URL?.trim();
+  if (callbackUrl) {
+    return stripTrailingSlash(
+      callbackUrl.replace(/\/auth\/linkedin\/callback\/?$/i, ""),
+    );
   }
-  const base = (process.env.APP_BASE_URL || "http://localhost:3000").replace(
-    /\/$/,
-    "",
+
+  const appBaseUrl = process.env.APP_BASE_URL?.trim();
+  if (appBaseUrl) return stripTrailingSlash(appBaseUrl);
+
+  if (req) {
+    return stripTrailingSlash(`${req.protocol}://${req.get("host")}`);
+  }
+
+  return stripTrailingSlash(
+    `http://localhost:${process.env.PORT || 3000}`,
   );
-  return `${base}/auth/linkedin/callback`;
+}
+
+function getRedirectUri(req) {
+  const explicit = process.env.LINKEDIN_CALLBACK_URL?.trim();
+  if (explicit) return stripTrailingSlash(explicit);
+  return `${resolveBaseUrl(req)}/auth/linkedin/callback`;
+}
+
+function getReauthUrl(req) {
+  return `${resolveBaseUrl(req)}/auth/linkedin/login`;
+}
+
+function isSharePointImageUrl(url) {
+  return Boolean(url && String(url).startsWith("/content/"));
+}
+
+function isLegacyExternalImageUrl(url) {
+  if (!url) return true;
+  const value = String(url);
+  return (
+    value.includes("cloudinary.com") ||
+    value.includes("licdn.com") ||
+    value.startsWith("http://") ||
+    value.startsWith("https://")
+  );
 }
 
 const TOKEN_KEY = "linkedin_token";
 const REFRESH_KEY = "linkedin_refresh_token";
+const EXPIRES_KEY = "linkedin_token_expires_at";
 const TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken";
+
+function getLinkedInHeaders(accessToken) {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    "X-Restli-Protocol-Version": "2.0.0",
+    "LinkedIn-Version": LINKEDIN_API_VERSION,
+  };
+}
+
+function assertLinkedInConfig() {
+  if (!CLIENT_ID || !CLIENT_SECRET || !ORG_ID) {
+    throw new Error(
+      "Faltan LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET o LINKEDIN_ORG_ID en .env",
+    );
+  }
+}
 
 function logLinkedInError(context, error) {
   const details = error.response?.data;
@@ -29,19 +89,24 @@ function logLinkedInError(context, error) {
   return detailStr;
 }
 
-async function saveTokens(accessToken, refreshToken) {
+async function saveConfigValue(key, value) {
   await db.query(
     `INSERT INTO system_config (key, value) VALUES ($1, $2)
      ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-    [TOKEN_KEY, accessToken],
+    [key, value],
   );
+}
+
+async function saveTokens(accessToken, refreshToken, expiresIn) {
+  await saveConfigValue(TOKEN_KEY, accessToken);
 
   if (refreshToken) {
-    await db.query(
-      `INSERT INTO system_config (key, value) VALUES ($1, $2)
-       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-      [REFRESH_KEY, refreshToken],
-    );
+    await saveConfigValue(REFRESH_KEY, refreshToken);
+  }
+
+  if (expiresIn) {
+    const expiresAt = Date.now() + Number(expiresIn) * 1000;
+    await saveConfigValue(EXPIRES_KEY, String(expiresAt));
   }
 }
 
@@ -61,19 +126,27 @@ async function getRefreshToken() {
   return rows.length > 0 ? rows[0].value : null;
 }
 
-// 1. Iniciar Login manual
-function getAuthorizationUrl() {
+function getAuthorizationUrl(req) {
+  assertLinkedInConfig();
+  const redirectUri = getRedirectUri(req);
   const scope = "r_organization_social";
-  const redirectUri = getRedirectUri();
-  return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: CLIENT_ID,
+    redirect_uri: redirectUri,
+    scope,
+    prompt: "consent",
+  });
+  console.log("[LINKEDIN] Iniciando OAuth con redirect_uri:", redirectUri);
+  return `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
 }
 
-// 2. Canjear código
-async function exchangeCodeForToken(code) {
+async function exchangeCodeForToken(code, req) {
+  const redirectUri = getRedirectUri(req);
   const values = {
     grant_type: "authorization_code",
     code: code,
-    redirect_uri: getRedirectUri(),
+    redirect_uri: redirectUri,
     client_id: CLIENT_ID,
     client_secret: CLIENT_SECRET,
   };
@@ -83,12 +156,14 @@ async function exchangeCodeForToken(code) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
 
-    const { access_token, refresh_token } = response.data;
-    await saveTokens(access_token, refresh_token);
+    const { access_token, refresh_token, expires_in } = response.data;
+    await saveTokens(access_token, refresh_token, expires_in);
 
     if (!refresh_token) {
       console.warn(
-        "[LINKEDIN] No se recibió refresh_token. La renovación automática no estará disponible hasta volver a autorizar.",
+        "[LINKEDIN] No se recibió refresh_token. El token dura ~60 días; vuelva a autorizar en",
+        getReauthUrl(req),
+        "antes de que expire.",
       );
     }
 
@@ -99,12 +174,11 @@ async function exchangeCodeForToken(code) {
   }
 }
 
-// 2b. Renovar access token con refresh token
-async function refreshAccessToken() {
+async function refreshAccessToken(req) {
   const refreshToken = await getRefreshToken();
   if (!refreshToken) {
     throw new Error(
-      "No hay refresh token guardado. Visite /auth/linkedin/login para reautorizar.",
+      `No hay refresh token guardado. Visite ${getReauthUrl(req)} para reautorizar.`,
     );
   }
 
@@ -120,8 +194,8 @@ async function refreshAccessToken() {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
 
-    const { access_token, refresh_token } = response.data;
-    await saveTokens(access_token, refresh_token || refreshToken);
+    const { access_token, refresh_token, expires_in } = response.data;
+    await saveTokens(access_token, refresh_token || refreshToken, expires_in);
     console.log("[LINKEDIN] Access token renovado automáticamente.");
     return access_token;
   } catch (error) {
@@ -130,52 +204,126 @@ async function refreshAccessToken() {
   }
 }
 
-function parsePosts(response) {
-  if (!response.data || !response.data.elements) return [];
+function postImageKey(enlaceUrl) {
+  return (
+    String(enlaceUrl || "post")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(-60) || "post"
+  );
+}
+
+async function persistImageToSharePoint(imageUrl, enlaceUrl) {
+  if (isSharePointImageUrl(imageUrl)) return imageUrl;
+  if (!imageUrl || imageUrl === FALLBACK_IMAGE) return FALLBACK_IMAGE;
+  if (!isLegacyExternalImageUrl(imageUrl)) {
+    return String(imageUrl).startsWith("/") ? imageUrl : FALLBACK_IMAGE;
+  }
+
+  try {
+    const response = await axios.get(imageUrl, {
+      responseType: "arraybuffer",
+      timeout: 30000,
+      headers: { "User-Agent": "Transworld-Intranet/1.0" },
+    });
+    const buffer = Buffer.from(response.data);
+    if (!buffer.length) return FALLBACK_IMAGE;
+
+    const ext = imageUrl.toLowerCase().includes(".png") ? ".png" : ".jpg";
+    const saved = await fileStorage.saveFile(
+      buffer,
+      LINKEDIN_IMAGES_FOLDER,
+      `${postImageKey(enlaceUrl)}${ext}`,
+    );
+    return saved.url;
+  } catch (error) {
+    console.warn("[LINKEDIN] No se pudo subir imagen a SharePoint:", error.message);
+    return FALLBACK_IMAGE;
+  }
+}
+
+async function enrichPostsWithSharePointImages(posts) {
+  const enriched = [];
+  for (const post of posts) {
+    const imagen_url = await persistImageToSharePoint(
+      post.imagen_url,
+      post.enlace_url,
+    );
+    enriched.push({ ...post, imagen_url });
+  }
+  return enriched;
+}
+
+function extractImageUrns(post) {
+  const urns = [];
+  const content = post.content || {};
+
+  if (content.media?.id?.startsWith("urn:li:image:")) {
+    urns.push(content.media.id);
+  }
+  if (content.article?.thumbnail?.startsWith("urn:li:image:")) {
+    urns.push(content.article.thumbnail);
+  }
+  if (Array.isArray(content.multiImage?.images)) {
+    for (const image of content.multiImage.images) {
+      if (image.id?.startsWith("urn:li:image:")) urns.push(image.id);
+    }
+  }
+
+  return urns;
+}
+
+async function fetchImageDownloadUrls(accessToken, imageUrns) {
+  const uniqueUrns = [...new Set(imageUrns)].slice(0, 5);
+  if (!uniqueUrns.length) return {};
+
+  const idsParam = `List(${uniqueUrns.map((urn) => encodeURIComponent(urn)).join(",")})`;
+
+  try {
+    const response = await axios.get(
+      `https://api.linkedin.com/rest/images?ids=${idsParam}`,
+      { headers: getLinkedInHeaders(accessToken) },
+    );
+
+    const map = {};
+    const results = response.data.results || {};
+    for (const [urn, info] of Object.entries(results)) {
+      if (info?.downloadUrl) map[urn] = info.downloadUrl;
+    }
+    return map;
+  } catch (error) {
+    logLinkedInError("Error resolviendo imágenes", error);
+    return {};
+  }
+}
+
+async function parsePosts(response, accessToken) {
+  if (!response.data?.elements) return [];
+
+  const published = response.data.elements.filter(
+    (post) => post.lifecycleState === "PUBLISHED",
+  );
+  const imageUrlMap = await fetchImageDownloadUrls(
+    accessToken,
+    published.flatMap(extractImageUrns),
+  );
 
   const posts = [];
-  for (const post of response.data.elements) {
+  for (const post of published) {
     try {
-      let text = "Publicación de Transworld";
-      let imageUrl = "/img/fondo-home.png";
-      const postUrl = `https://www.linkedin.com/feed/update/${post.id}`;
+      const text = post.commentary?.trim() || "Publicación de Transworld";
+      let imageUrl = FALLBACK_IMAGE;
+      const postUrl = `https://www.linkedin.com/feed/update/${encodeURIComponent(post.id)}`;
 
-      if (
-        post.specificContent &&
-        post.specificContent["com.linkedin.ugc.ShareContent"]
-      ) {
-        const shareContent =
-          post.specificContent["com.linkedin.ugc.ShareContent"];
-        if (
-          shareContent.shareCommentary &&
-          shareContent.shareCommentary.text
-        ) {
-          text = shareContent.shareCommentary.text;
-        }
-      }
-
-      const contentStr = JSON.stringify(post.specificContent || {});
-      const urlsMatch = contentStr.match(
-        /https:\/\/media\.licdn\.com\/dms\/image[^\s"\\]+/g,
-      );
-
-      if (urlsMatch && urlsMatch.length > 0) {
-        imageUrl = urlsMatch[0];
-      } else if (
-        post.specificContent &&
-        post.specificContent["com.linkedin.ugc.ShareContent"]
-      ) {
-        const mediaList =
-          post.specificContent["com.linkedin.ugc.ShareContent"].media || [];
-        if (
-          mediaList.length > 0 &&
-          mediaList[0].thumbnails &&
-          mediaList[0].thumbnails.length > 0
-        ) {
-          imageUrl = mediaList[0].thumbnails[0].url;
-        } else if (mediaList.length > 0 && mediaList[0].originalUrl) {
-          imageUrl = mediaList[0].originalUrl;
-        }
+      const imageUrns = extractImageUrns(post);
+      if (imageUrns.length > 0 && imageUrlMap[imageUrns[0]]) {
+        imageUrl = imageUrlMap[imageUrns[0]];
+      } else {
+        const contentStr = JSON.stringify(post.content || {});
+        const urlsMatch = contentStr.match(
+          /https:\/\/media\.licdn[^\s"\\]+/g,
+        );
+        if (urlsMatch?.length) imageUrl = urlsMatch[0];
       }
 
       posts.push({ texto: text, imagen_url: imageUrl, enlace_url: postUrl });
@@ -187,45 +335,123 @@ function parsePosts(response) {
   return posts.slice(0, 3);
 }
 
-async function fetchUgcPosts(accessToken) {
+async function fetchOrganizationPosts(accessToken) {
+  assertLinkedInConfig();
   const organizationUrn = `urn:li:organization:${ORG_ID}`;
+  const author = encodeURIComponent(organizationUrn);
   return axios.get(
-    `https://api.linkedin.com/v2/ugcPosts?q=authors&authors=List(${encodeURIComponent(organizationUrn)})&count=5`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "X-Restli-Protocol-Version": "2.0.0",
-      },
-    },
+    `https://api.linkedin.com/rest/posts?author=${author}&q=author&count=5&sortBy=LAST_MODIFIED`,
+    { headers: getLinkedInHeaders(accessToken) },
   );
 }
 
-// 3. Obtener Posts
-async function getCompanyPosts() {
-  let accessToken = await getAccessToken();
-  if (!accessToken) return [];
+async function getPostsFromDb() {
+  try {
+    const { rows } = await db.query(
+      `SELECT imagen_url, enlace_url
+       FROM linkedin_posts
+       ORDER BY fecha_creacion DESC
+       LIMIT 3`,
+    );
+
+    return rows
+      .filter((row) => isSharePointImageUrl(row.imagen_url))
+      .map((row) => ({
+        texto: "Publicación de Transworld",
+        imagen_url: row.imagen_url,
+        enlace_url: row.enlace_url,
+      }));
+  } catch (error) {
+    console.warn("[LINKEDIN] No se pudo leer linkedin_posts:", error.message);
+    return [];
+  }
+}
+
+async function syncPostsToDb(posts) {
+  if (!posts.length) return;
 
   try {
-    const response = await fetchUgcPosts(accessToken);
-    return parsePosts(response);
+    await db.query("DELETE FROM linkedin_posts");
+    for (const post of posts.slice(0, 3)) {
+      await db.query(
+        `INSERT INTO linkedin_posts (imagen_url, enlace_url, fecha_creacion)
+         VALUES ($1, $2, NOW())`,
+        [post.imagen_url, post.enlace_url],
+      );
+    }
+  } catch (error) {
+    console.warn("[LINKEDIN] No se pudo sincronizar linkedin_posts:", error.message);
+  }
+}
+
+async function fetchPostsFromApi(accessToken) {
+  const response = await fetchOrganizationPosts(accessToken);
+  const parsed = await parsePosts(response, accessToken);
+  if (!parsed.length) return [];
+
+  const posts = await enrichPostsWithSharePointImages(parsed);
+  await syncPostsToDb(posts);
+  return posts;
+}
+
+async function getCompanyPosts() {
+  let accessToken = await getAccessToken();
+  if (!accessToken) {
+    const cached = await getPostsFromDb();
+    if (cached.length) {
+      console.log("[LINKEDIN] Sin token activo; usando caché en SharePoint.");
+    }
+    return cached;
+  }
+
+  try {
+    const posts = await fetchPostsFromApi(accessToken);
+    if (posts.length) return posts;
+    return getPostsFromDb();
   } catch (error) {
     if (error.response?.status !== 401) {
       logLinkedInError("Error obteniendo posts", error);
-      return [];
+      return getPostsFromDb();
+    }
+
+    const refreshToken = await getRefreshToken();
+    if (!refreshToken) {
+      console.warn(
+        `[LINKEDIN] Token expirado y sin refresh token. Reautorice en ${getReauthUrl()}.`,
+      );
+      const cached = await getPostsFromDb();
+      if (cached.length) {
+        console.warn("[LINKEDIN] Mostrando caché en SharePoint mientras tanto.");
+      }
+      return cached;
     }
 
     try {
       accessToken = await refreshAccessToken();
-      const response = await fetchUgcPosts(accessToken);
-      return parsePosts(response);
+      const posts = await fetchPostsFromApi(accessToken);
+      if (posts.length) return posts;
+      return getPostsFromDb();
     } catch (refreshError) {
       logLinkedInError("Renovación automática fallida", refreshError);
+      const cached = await getPostsFromDb();
+      if (cached.length) {
+        console.warn(
+          `[LINKEDIN] Token expirado; mostrando caché en SharePoint. Reautorice en ${getReauthUrl()}.`,
+        );
+        return cached;
+      }
       console.error(
-        "[LINKEDIN] Token inválido o expirado. Reautorice en /auth/linkedin/login",
+        `[LINKEDIN] Token inválido y sin caché en SharePoint. Reautorice en ${getReauthUrl()}`,
       );
       return [];
     }
   }
 }
 
-module.exports = { getAuthorizationUrl, exchangeCodeForToken, getCompanyPosts };
+module.exports = {
+  getAuthorizationUrl,
+  exchangeCodeForToken,
+  getCompanyPosts,
+  getRedirectUri,
+  getReauthUrl,
+};

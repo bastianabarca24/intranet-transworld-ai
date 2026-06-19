@@ -978,7 +978,7 @@ router.get("/logout", (req, res) => {
 // LINKEDIN
 // ==========================================
 router.get("/auth/linkedin/login", (req, res) => {
-  res.redirect(linkedinService.getAuthorizationUrl());
+  res.redirect(linkedinService.getAuthorizationUrl(req));
 });
 
 router.get("/auth/linkedin/callback", async (req, res) => {
@@ -986,7 +986,7 @@ router.get("/auth/linkedin/callback", async (req, res) => {
   if (!code) return res.send("Error: No se recibió código de LinkedIn");
 
   try {
-    await linkedinService.exchangeCodeForToken(code);
+    await linkedinService.exchangeCodeForToken(code, req);
     res.send(`
       <div style="font-family: sans-serif; text-align: center; margin-top: 50px;">
         <h1 style="color: #28a745;">¡Conexión Exitosa!</h1>
