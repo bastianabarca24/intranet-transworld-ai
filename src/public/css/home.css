@@ -1080,7 +1080,27 @@
 
 @media (max-width: 600px) {
   .home-finance {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .home-finance__item {
+    padding: 8px 6px;
+    min-width: 0;
+  }
+
+  .home-finance__label {
+    font-size: 0.62rem;
+    line-height: 1.2;
+  }
+
+  .home-finance__value {
+    font-size: 0.78rem;
+    gap: 4px;
+  }
+
+  .home-finance__trend {
+    font-size: 0.68rem;
   }
 
   .home-widgets {
@@ -1224,4 +1244,18 @@ html[data-theme="dark"] .home-tutorial__badge {
 
 html[data-theme="dark"] .home-tutorial__icon {
   background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 768px) {
+  .home-tutorial {
+    width: 100% !important;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .home-tutorial__btn {
+    width: 100%;
+  }
 }

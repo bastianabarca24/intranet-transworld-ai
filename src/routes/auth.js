@@ -140,13 +140,13 @@ function needsAdminAuthorization(user) {
 }
 
 async function notifyTIAdminsNewUser(firstName, lastName, email, isTransworld) {
-  // Solo administradores que pertenecen al área de trabajo TI.
+  // Solo administradores que pertenecen al área de trabajo Informática.
   const { rows } = await pool.query(
     `SELECT u.email
      FROM users u
      JOIN work_areas at ON at.id = u.work_area_id
      WHERE u.role IN ($1, $2)
-       AND at.area_name ILIKE 'TI'
+       AND at.area_name ILIKE 'Informática'
        AND u.email IS NOT NULL AND TRIM(u.email) <> ''`,
     [ROLES.ADMINISTRADOR, "admin"],
   );

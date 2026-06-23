@@ -62,6 +62,80 @@
     max-width: 100%;
   }
 
+  .personal-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    flex-wrap: wrap;
+  }
+
+  .personal-search {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0 12px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .personal-search:focus-within {
+    border-color: #003a70;
+    box-shadow: 0 0 0 3px rgba(0, 58, 112, 0.1);
+  }
+
+  .personal-search-icon {
+    color: #94a3b8;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+  }
+
+  .personal-search input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 10px 0;
+    font-size: 0.9rem;
+    color: #334155;
+    min-width: 0;
+  }
+
+  .personal-search input::placeholder { color: #94a3b8; }
+
+  .personal-filtro-area {
+    min-width: 200px;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.9rem;
+    color: #334155;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .personal-filtro-area:focus {
+    outline: none;
+    border-color: #003a70;
+    box-shadow: 0 0 0 3px rgba(0, 58, 112, 0.1);
+  }
+
+  .personal-sin-resultados {
+    text-align: center;
+    color: #718096;
+    padding: 30px 16px;
+    display: none;
+  }
+
+  .personal-sin-resultados.show { display: block; }
+
   .tabla-personal {
     width: 100%;
     border-collapse: collapse;
@@ -123,13 +197,19 @@
 
   .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
 
-  .pill-area  { background: #dbeafe; color: #1e40af; }
-  .pill-ti    { background: #dcfce7; color: #166534; }
-  .pill-ventas { background: #fef9c3; color: #854d0e; }
-  .pill-admin { background: #fce7f3; color: #9d174d; }
-  .pill-ops   { background: #f3e8ff; color: #6b21a8; }
-  .pill-finanzas { background: #ffedd5; color: #9a3412; }
-  .pill-mktg  { background: #e0f2fe; color: #075985; }
+  /* Chips por área de trabajo (ver src/constants/workAreas.js) */
+  .pill-area-default  { background: #e2e8f0; color: #475569; }
+  .pill-area-informatica { background: #dcfce7; color: #166534; }
+  .pill-area-logistica { background: #ede9fe; color: #5b21b6; }
+  .pill-area-bodega   { background: #fef3c7; color: #92400e; }
+  .pill-area-comercial { background: #fef9c3; color: #854d0e; }
+  .pill-area-ventas   { background: #ffedd5; color: #c2410c; }
+  .pill-area-control  { background: #e0e7ff; color: #3730a3; }
+  .pill-area-electrica { background: #cffafe; color: #0e7490; }
+  .pill-area-finanzas { background: #fce7f3; color: #9d174d; }
+  .pill-area-gerencia { background: #fae8ff; color: #86198f; }
+  .pill-area-marketing { background: #e0f2fe; color: #075985; }
+  .pill-area-tramonto { background: #ccfbf1; color: #0f766e; }
 
   .pill-rol-admin    { background: #dc2626; color: #fff; }
   .pill-rol-rrhh     { background: #7c3aed; color: #fff; }
@@ -209,13 +289,14 @@
     align-items: center;
     justify-content: center;
     overflow-y: auto;
-    padding: 20px 0;
+    padding: 15px;
+    box-sizing: border-box;
   }
 
   .modal-crear-colaborador .modal-content {
     background: #fff;
     color: #1a202c;
-    width: 92%;
+    width: 100%;
     max-width: 620px;
     max-height: 90vh;
     overflow-y: auto;
@@ -354,14 +435,15 @@
     align-items: center;
     justify-content: center;
     overflow-y: auto;
-    padding: 20px 0;
+    padding: 15px;
+    box-sizing: border-box;
   }
 
   .modal-editar-colaborador .modal-content {
     background: #fff;
     color: #1a202c;
-    width: 94%;
-    max-width: 960px;
+    width: 100%;
+    max-width: var(--layout-content-max-width, 1200px);
     max-height: 90vh;
     padding: 0;
     overflow: hidden;
@@ -518,17 +600,6 @@
 <% } %>
 
 <%
-  function pillArea(area) {
-    if (!area) return 'pill pill-area';
-    const a = area.toLowerCase();
-    if (a.includes('ti') || a.includes('tecnolog') || a.includes('sistemas')) return 'pill pill-ti';
-    if (a.includes('vent') || a.includes('comercial')) return 'pill pill-ventas';
-    if (a.includes('admin') || a.includes('gerencia') || a.includes('direcc')) return 'pill pill-admin';
-    if (a.includes('operat') || a.includes('logist') || a.includes('bodega')) return 'pill pill-ops';
-    if (a.includes('finanz') || a.includes('contab') || a.includes('teso')) return 'pill pill-finanzas';
-    if (a.includes('market') || a.includes('comuni')) return 'pill pill-mktg';
-    return 'pill pill-area';
-  }
   function pillRol(rol) {
     if (!rol) return 'pill pill-rol-deshabilitado';
     const r = rol.toLowerCase();
@@ -552,7 +623,7 @@
   <div class="page-header">
     <div>
       <h2 class="page-title">Colaboradores de Transworld Chile</h2>
-      <p class="page-description"><%= personas ? personas.length : 0 %> colaboradores en el registro</p>
+      <p class="page-description"><span id="contadorColaboradores"><%= personas ? personas.length : 0 %></span> colaboradores en el registro</p>
     </div>
     <a href="/RRHH" class="link-volver">← Volver al menú</a>
   </div>
@@ -561,6 +632,28 @@
     <% if (!personas || personas.length === 0) { %>
       <p style="text-align:center; color:#718096; padding:30px 0;">No hay colaboradores registrados.</p>
     <% } else { %>
+      <div class="personal-toolbar">
+        <label class="personal-search" for="buscarColaborador">
+          <span class="personal-search-icon" aria-hidden="true">🔍</span>
+          <input
+            type="search"
+            id="buscarColaborador"
+            placeholder="Buscar por nombre, correo o teléfono..."
+            autocomplete="off"
+          >
+        </label>
+        <select id="filtroArea" class="personal-filtro-area" aria-label="Filtrar por área">
+          <option value="">Todas las áreas</option>
+          <% if (areas && areas.length) { %>
+            <% areas.forEach(area => { %>
+              <option value="<%= area.area_name %>"><%= area.area_name %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+      <p id="personalSinResultados" class="personal-sin-resultados" role="status">
+        No se encontraron colaboradores con los filtros aplicados.
+      </p>
       <table class="tabla-personal" id="tablaPersonal">
         <thead>
           <tr>
@@ -598,7 +691,10 @@
               const tieneCorreo = Boolean(p.email && String(p.email).trim());
               const correoVerificado = p.email_confirmed === true || p.email_confirmed === 't' || p.email_confirmed === 1;
             %>
-            <tr>
+            <tr
+              data-area="<%= areaNombre %>"
+              data-search="<%= [nombreCompleto, correo !== '-' ? correo : '', telefono !== '-' ? telefono : ''].join(' ').toLowerCase() %>"
+            >
               <td>
                 <% if (p.photo) { %>
                   <img src="<%= p.photo %>" alt="Foto" class="avatar">
@@ -616,7 +712,7 @@
               </td>
 
               <td>
-                <span class="<%= pillArea(areaNombre) %>"><%= areaNombre %></span>
+                <span class="<%= getWorkAreaPillClass(areaNombre) %>"><%= areaNombre %></span>
               </td>
 
               <td class="col-correo"><%= correo %></td>
@@ -702,6 +798,45 @@
 <% } %>
 <script>
   const sortDir = { 1: true };
+
+  function filtrarColaboradores() {
+    const buscarInput = document.getElementById('buscarColaborador');
+    const filtroArea = document.getElementById('filtroArea');
+    const tbody = document.querySelector('#tablaPersonal tbody');
+    const sinResultados = document.getElementById('personalSinResultados');
+    const contador = document.getElementById('contadorColaboradores');
+    if (!tbody) return;
+
+    const query = (buscarInput ? buscarInput.value : '').trim().toLowerCase();
+    const area = filtroArea ? filtroArea.value : '';
+    let visibles = 0;
+
+    tbody.querySelectorAll('tr').forEach((row) => {
+      const texto = row.dataset.search || '';
+      const areaRow = row.dataset.area || '';
+      const coincideBusqueda = !query || texto.includes(query);
+      const coincideArea = !area || areaRow === area;
+      const mostrar = coincideBusqueda && coincideArea;
+      row.style.display = mostrar ? '' : 'none';
+      if (mostrar) visibles += 1;
+    });
+
+    if (contador) contador.textContent = String(visibles);
+    if (sinResultados) sinResultados.classList.toggle('show', visibles === 0);
+  }
+
+  function initFiltrosPersonal() {
+    const buscarInput = document.getElementById('buscarColaborador');
+    const filtroArea = document.getElementById('filtroArea');
+    if (buscarInput) buscarInput.addEventListener('input', filtrarColaboradores);
+    if (filtroArea) filtroArea.addEventListener('change', filtrarColaboradores);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFiltrosPersonal);
+  } else {
+    initFiltrosPersonal();
+  }
 
   function sortTable(th) {
     const colIdx = Array.from(th.parentElement.children).indexOf(th);

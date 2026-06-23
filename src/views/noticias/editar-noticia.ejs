@@ -210,12 +210,12 @@
     
     <div class="form-group">
       <label class="form-label" for="titulo">Título de la noticia *</label>
-      <input type="text" id="titulo" name="title" class="form-control" value="<%= noticia.title %>" required>
+      <input type="text" id="titulo" name="titulo" class="form-control" value="<%= noticia.title %>" required>
     </div>
 
     <div class="form-group">
       <label class="form-label" for="subtitulo">Subtítulo o Resumen</label>
-      <input type="text" id="subtitulo" name="subtitle" class="form-control" value="<%= noticia.subtitle || '' %>">
+      <input type="text" id="subtitulo" name="subtitulo" class="form-control" value="<%= noticia.subtitle || '' %>">
     </div>
 
     <div class="form-group">
@@ -243,8 +243,10 @@
 
       <div class="file-input-wrapper">
         <label class="form-label" style="margin-bottom: 10px;">Añadir NUEVOS archivos a la galería</label>
-        <input type="file" id="filesGaleria" multiple accept="image/*,video/*" class="form-control" style="background: white;">
-        <span class="form-helper">Puedes seleccionar varios archivos a la vez.</span>
+        <input type="file" id="filesGaleria" multiple
+               accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+               class="form-control" style="background: white;">
+        <span class="form-helper">Documentos, imágenes y videos. Puedes seleccionar varios a la vez.</span>
       </div>
       
       <input type="hidden" id="galeriaData" name="adjuntos_data" value="">
@@ -252,7 +254,7 @@
 
     <div class="form-group">
       <label class="form-label" for="contenido">Cuerpo de la Noticia *</label>
-      <textarea id="contenido" name="content" class="form-control"><%= noticia.content %></textarea>
+      <textarea id="contenido" name="contenido" class="form-control"><%= noticia.content %></textarea>
     </div>
 
     <div id="upload-status"></div>
@@ -295,6 +297,14 @@
       if (item.resource_type === 'video' || item.tipo === 'video') {
         div.innerHTML = `
           <video src="${item.url}" muted></video>
+          <button type="button" class="btn-remove-img" onclick="eliminarItem(${index})" title="Eliminar">&times;</button>
+        `;
+      } else if (item.tipo === 'document' || item.resource_type === 'raw') {
+        div.innerHTML = `
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;text-decoration:none;color:#1f2937;padding:8px;text-align:center;">
+            <span style="font-size:2rem;">📄</span>
+            <span style="font-size:0.72rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${item.nombre || 'Documento'}</span>
+          </a>
           <button type="button" class="btn-remove-img" onclick="eliminarItem(${index})" title="Eliminar">&times;</button>
         `;
       } else {
@@ -356,11 +366,15 @@
         for (let i = 0; i < fGaleria.length; i++) {
           statusDiv.innerHTML = `Subiendo archivo nuevo a la galería (${i + 1}/${fGaleria.length})...`;
           const dataG = await uploadOne(fGaleria[i]);
+          const tipo = dataG.resource_type === 'image' ? 'image'
+            : dataG.resource_type === 'video' ? 'video'
+            : 'document';
           galeriaActual.push({
             url: dataG.secure_url,
             public_id: dataG.public_id,
-            resource_type: 'image',
-            tipo: 'image'
+            resource_type: dataG.resource_type,
+            tipo: tipo,
+            nombre: fGaleria[i].name
           });
         }
         galeriaDataInput.value = JSON.stringify(galeriaActual);

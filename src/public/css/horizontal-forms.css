@@ -218,8 +218,8 @@
 
 /* Modales horizontales */
 .modal-content--horizontal {
-  max-width: 900px !important;
-  width: 94% !important;
+  max-width: var(--layout-content-max-width, 1200px) !important;
+  width: 100% !important;
   max-height: 90vh;
   padding: 0 !important;
   overflow: hidden;
@@ -389,9 +389,5 @@ html[data-theme="dark"] .modal-h-main {
   .form-grid-3,
   .modal-platforms-grid {
     grid-template-columns: 1fr;
-  }
-
-  .modal-content--horizontal {
-    max-width: 600px !important;
   }
 }

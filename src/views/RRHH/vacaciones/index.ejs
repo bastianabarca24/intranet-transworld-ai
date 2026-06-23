@@ -1,0 +1,173 @@
+<link rel="stylesheet" href="/css/vacaciones.css">
+
+<style>
+  .page-header-exec {
+    border-bottom: 2px solid #003a70;
+    padding-bottom: 12px;
+    margin-bottom: 25px;
+  }
+
+  .page-title-exec {
+    color: #003a70;
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .page-description-exec {
+    color: #4a5568;
+    font-size: 1.05rem;
+    margin-bottom: 30px;
+  }
+
+  .vac-page-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 10px;
+  }
+
+  .grid-opciones-exec {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 25px;
+    margin-bottom: 10px;
+  }
+
+  .card-opcion-exec {
+    background: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 12px;
+    padding: 30px 25px;
+    text-decoration: none;
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-card, 0 2px 5px rgba(0, 0, 0, 0.02));
+    color: var(--color-text, #333333);
+  }
+
+  .card-opcion-exec:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.08);
+    border-color: var(--color-border-strong, #cbd5e0);
+    background: var(--color-surface-muted, #f8fafc);
+  }
+
+  .card-icon-wrapper {
+    background: #eef4ff;
+    color: #175cd3;
+    width: 55px;
+    height: 55px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    border: 1px solid #d1e0ff;
+  }
+
+  .card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .card-title {
+    color: var(--color-heading, #003a70);
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .card-desc {
+    color: var(--color-text-muted, #718096);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .boton-volver {
+    display: inline-block;
+    background: #f8fafc;
+    border: 1px solid #cbd5e0;
+    color: #4a5568;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .boton-volver:hover {
+    background: #edf2f7;
+    color: #1a202c;
+  }
+</style>
+
+<div class="contenedor">
+  <div class="vac-page-top">
+    <div class="page-header-exec" style="flex: 1; min-width: 0; margin-bottom: 0;">
+      <h2 class="page-title-exec">Vacaciones</h2>
+    </div>
+    <a href="/RRHH" class="boton-volver">← Volver a RRHH</a>
+  </div>
+
+  <p class="page-description-exec">
+    Gestiona tus solicitudes y saldos de vacaciones.
+  </p>
+
+  <% if (typeof success !== 'undefined' && success) { %>
+    <div class="vac-alert vac-alert-success"><%= success %></div>
+  <% } %>
+  <% if (typeof error !== 'undefined' && error) { %>
+    <div class="vac-alert vac-alert-error"><%= error %></div>
+  <% } %>
+
+  <div class="grid-opciones-exec">
+    <a href="/RRHH/vacaciones/mis-vacaciones" class="card-opcion-exec">
+      <div class="card-icon-wrapper">🏖️</div>
+      <div class="card-content">
+        <h3 class="card-title">Mis vacaciones</h3>
+        <p class="card-desc">Consulta tu saldo, solicita días y revisa tu historial.</p>
+      </div>
+    </a>
+
+    <a href="/RRHH/vacaciones/calendario" class="card-opcion-exec">
+      <div class="card-icon-wrapper">📅</div>
+      <div class="card-content">
+        <h3 class="card-title">Calendario</h3>
+        <p class="card-desc">
+          <% if (locals.isAdministrador) { %>Vacaciones del equipo.<% } else { %>Tus vacaciones programadas.<% } %>
+        </p>
+      </div>
+    </a>
+
+    <% if (locals.isAdministrador) { %>
+      <a href="/RRHH/vacaciones/gestion" class="card-opcion-exec">
+        <div class="card-icon-wrapper">🗂️</div>
+        <div class="card-content">
+          <h3 class="card-title">Gestión RRHH</h3>
+          <p class="card-desc">Aprueba o rechaza solicitudes y ajusta saldos.</p>
+        </div>
+      </a>
+
+      <a href="/RRHH/vacaciones/feriados" class="card-opcion-exec">
+        <div class="card-icon-wrapper">🎌</div>
+        <div class="card-content">
+          <h3 class="card-title">Feriados</h3>
+          <p class="card-desc">Administra los feriados de Chile y Perú.</p>
+        </div>
+      </a>
+    <% } %>
+  </div>
+</div>

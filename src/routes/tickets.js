@@ -7,6 +7,7 @@ const { isAdministrador } = require("../constants/roles");
 const multer = require('multer');
 const {
   ticketStatusToDb,
+  ticketStatusFromDb,
   ticketPriorityToDb,
   mapTicketReplyForView,
 } = require("../utils/schemaMappers");
@@ -184,7 +185,7 @@ router.get("/tickets", async (req, res) => {
   try {
     const { rows: results } = await db.query(sql, params);
     res.render("sistemas/tickets", {
-      titulo: "Ticketera",
+      titulo: "Soporte",
       tickets: results,
       user: user,
     });
@@ -202,7 +203,11 @@ router.get("/tickets/nuevo", (req, res) => {
 });
 
 router.post("/tickets/crear", async (req, res) => {
-  const { titulo, descripcion, categoria, prioridad, adjuntos_data } = req.body;
+  const title = req.body.title ?? req.body.titulo;
+  const description = req.body.description ?? req.body.descripcion;
+  const category = req.body.category ?? req.body.categoria;
+  const priority = ticketPriorityToDb(req.body.priority ?? req.body.prioridad);
+  const { adjuntos_data } = req.body;
   if (!req.session.user) return res.redirect("/login");
 
   try {
@@ -211,9 +216,9 @@ router.post("/tickets/crear", async (req, res) => {
       [req.session.user.id],
     );
     const u = userRows[0];
-    const solicitante_nombre =
+    const requesterName =
       u.first_name + (u.last_name ? " " + u.last_name : "");
-    const solicitante_email = u.email;
+    const requesterEmail = u.email;
 
     const sql = `
       INSERT INTO support_tickets (title, description, category, priority, status, requester_name, requester_email, attachments, read_by_admin, read_by_user) 
@@ -222,21 +227,21 @@ router.post("/tickets/crear", async (req, res) => {
     `;
 
     const { rows } = await db.query(sql, [
-      titulo,
-      descripcion,
-      categoria,
-      ticketPriorityToDb(prioridad),
-      solicitante_nombre,
-      solicitante_email,
+      title,
+      description,
+      category,
+      priority,
+      requesterName,
+      requesterEmail,
       adjuntos_data || "[]",
     ]);
     const nuevoId = rows[0].id;
 
     if (process.env.ADMIN_NOTIFY_EMAIL) {
-      let mensajeBase = `Ticket generado por ${solicitante_nombre}\n\nTitulo: ${titulo}\n\nDescripción: ${descripcion}`;
+      let mensajeBase = `Ticket generado por ${requesterName}\n\nTitulo: ${title}\n\nDescripción: ${description}`;
       sendMail({
         to: process.env.ADMIN_NOTIFY_EMAIL,
-        subject: `Nuevo Ticket #${nuevoId}: ${titulo}`,
+        subject: `Nuevo Ticket #${nuevoId}: ${title}`,
         text: generarTextoCorreo(mensajeBase, adjuntos_data),
         html: generarHtmlCorreo(mensajeBase, adjuntos_data),
         bcc: EMAIL_SUPPORT,
@@ -284,27 +289,26 @@ router.post(
   requireRole.administrador(),
   async (req, res) => {
     const { id } = req.params;
-    const { categoria, prioridad, estado, mensaje_respuesta, adjuntos_data } =
-      req.body;
-
-    const estadoDb = ticketStatusToDb(estado);
-    const prioridadDb = ticketPriorityToDb(prioridad);
+    const category = req.body.category ?? req.body.categoria;
+    const priority = ticketPriorityToDb(req.body.priority ?? req.body.prioridad);
+    const status = ticketStatusToDb(req.body.status ?? req.body.estado);
+    const { mensaje_respuesta, adjuntos_data } = req.body;
 
     let sql = `UPDATE support_tickets SET category = $1, priority = $2, status = $3`;
-    if (estado === "Pendiente de cierre") sql += `, resolved_at = NOW()`;
-    else if (estado === "Cerrado") sql += `, closed_at = NOW()`;
-    else if (estado === "Abierto")
+    if (status === "pending_close") sql += `, resolved_at = NOW()`;
+    else if (status === "closed") sql += `, closed_at = NOW()`;
+    else if (status === "open")
       sql += `, resolved_at = NULL, closed_at = NULL`;
     sql += ` WHERE id = $4`;
 
     try {
-      await db.query(sql, [categoria, prioridadDb, estadoDb, id]);
+      await db.query(sql, [category, priority, status, id]);
 
       const tieneMensaje =
         mensaje_respuesta && mensaje_respuesta.trim().length > 0;
       const tieneAdjuntos = adjuntos_data && adjuntos_data.length > 2;
 
-      if (tieneMensaje || tieneAdjuntos || estado === "Pendiente de cierre") {
+      if (tieneMensaje || tieneAdjuntos || status === "pending_close") {
         if (tieneMensaje || tieneAdjuntos) {
           await db.query(
             `INSERT INTO ticket_replies (ticket_id, message, sender, attachments, created_at) VALUES ($1, $2, $3, $4, NOW())`,
@@ -323,7 +327,7 @@ router.post(
         );
         if (ticket.length > 0) {
           let asunto = `Actualización Ticket #${id}: ${ticket[0].title}`;
-          let cuerpo = `Hola,\n\nSe ha actualizado tu ticket. Nuevo estado: ${estado.toUpperCase()}.\n`;
+          let cuerpo = `Hola,\n\nSe ha actualizado tu ticket. Nuevo estado: ${ticketStatusFromDb(status).toUpperCase()}.\n`;
           if (tieneMensaje) cuerpo += `\nMensaje: "${mensaje_respuesta}"`;
 
           sendMail({

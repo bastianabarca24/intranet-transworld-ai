@@ -1,3 +1,14 @@
+const {
+  vacationStatusLabel,
+  vacationStatusBadge,
+  countryLabel,
+  countryFlag,
+} = require("../constants/vacationStatuses");
+const {
+  formatDisplay,
+  toDateOnly,
+} = require("./vacationDateUtils");
+
 const TICKET_STATUS_TO_DB = {
   Abierto: "open",
   "En curso": "in_progress",
@@ -138,6 +149,56 @@ function mapPersonaForView(row) {
   };
 }
 
+function vacationRequestDays(row) {
+  return row.country_code === "PE"
+    ? Number(row.calendar_days || 0)
+    : Number(row.business_days || 0);
+}
+
+function mapVacationRequestForView(row) {
+  if (!row) return row;
+  const reviewerName =
+    [row.reviewer_first_name, row.reviewer_last_name].filter(Boolean).join(" ") ||
+    null;
+  const collaboratorName =
+    [row.first_name, row.last_name].filter(Boolean).join(" ") || null;
+  return {
+    ...row,
+    collaboratorName,
+    startDateFmt: formatDisplay(row.start_date),
+    endDateFmt: formatDisplay(row.end_date),
+    days: vacationRequestDays(row),
+    dayUnit: row.country_code === "PE" ? "calendario" : "hábiles",
+    statusLabel: vacationStatusLabel(row.status),
+    statusBadge: vacationStatusBadge(row.status),
+    countryLabel: countryLabel(row.country_code),
+    countryFlag: countryFlag(row.country_code),
+    reviewerName,
+    reviewedAtFmt: row.reviewed_at ? formatDisplay(row.reviewed_at) : null,
+  };
+}
+
+function mapVacationPeriodForView(row) {
+  if (!row) return row;
+  const available =
+    Number(row.entitled_days) +
+    Number(row.adjusted_days) -
+    Number(row.used_days);
+  const today = toDateOnly(new Date());
+  const expired = row.expires_at ? toDateOnly(row.expires_at) < today : false;
+  return {
+    ...row,
+    periodStartFmt: formatDisplay(row.period_start),
+    periodEndFmt: formatDisplay(row.period_end),
+    expiresAtFmt: row.expires_at ? formatDisplay(row.expires_at) : null,
+    available: Math.round(available * 100) / 100,
+    entitled: Number(row.entitled_days),
+    used: Number(row.used_days),
+    adjusted: Number(row.adjusted_days),
+    expired,
+  };
+}
+
 module.exports = {
   ticketStatusToDb,
   ticketStatusFromDb,
@@ -152,4 +213,6 @@ module.exports = {
   mapTicketForView,
   mapTicketReplyForView,
   mapPersonaForView,
+  mapVacationRequestForView,
+  mapVacationPeriodForView,
 };

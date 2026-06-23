@@ -28,9 +28,10 @@
     usuario : ((typeof user !== 'undefined' && user) ? user : null);
     let displayName = 'Usuario';
     if (currentUser) {
-      if (currentUser.username) displayName = currentUser.username;
+      if (currentUser.nombre) displayName = currentUser.nombre;
       else if (currentUser.first_name) displayName = currentUser.first_name + (currentUser.last_name ? ' ' + currentUser.last_name : '');
       else if (currentUser.name) displayName = currentUser.name;
+      else if (currentUser.username) displayName = currentUser.username;
     }
   %>
 
@@ -38,7 +39,8 @@
 <nav class="mobile-sidebar" id="mobile-sidebar">
   <span class="close-btn" id="close-menu">&times;</span>
 
-  <a href="/sistemas/tickets/nuevo" class="btn-ticket-mobile js-open-ticket-modal" title="Abrir nuevo ticket de soporte">ABRIR TICKET</a>
+  <div class="mobile-sidebar__body">
+  <a href="/">INICIO</a>
 
   <a href="/noticias">NOTICIAS</a>
   
@@ -54,6 +56,7 @@
   <div class="sub-menu">
     <a href="/RRHH/organigrama">Organigrama</a>
     <a href="/RRHH/personal">Personal</a>
+    <a href="/RRHH/vacaciones">Vacaciones</a>
     <a href="https://transworld.mirexmas.com/" target="_blank">Rex+</a>
     <a href="https://www.achs.cl/" target="_blank">ACHS</a>
     <a href="https://www.cajalosandes.cl/" target="_blank">Caja los Andes</a>
@@ -63,22 +66,21 @@
 
   <a href="/apps">APLICACIONES</a>
   <a href="/sistemas/tickets" class="ticket-notif-target">SOPORTE</a>
+  </div>
 
   <% if (currentUser) { %>
-    <div class="nav-user-menu nav-user-menu--mobile">
-      <button type="button" class="user-name nav-user-link nav-user-trigger" aria-expanded="false" aria-haspopup="true" aria-label="Abrir menú de usuario">
+    <div class="mobile-sidebar__footer">
+      <a href="/perfil" class="mobile-sidebar__profile">
         <% if (currentUser.photo || currentUser.foto) { %>
-          <img src="<%= currentUser.photo || currentUser.foto %>" alt="Foto" class="nav-user-photo">
+          <img src="<%= currentUser.photo || currentUser.foto %>" alt="Foto de perfil" class="nav-user-photo">
         <% } else { %>
           <div class="nav-user-avatar">
             <%= displayName.charAt(0).toUpperCase() %>
           </div>
         <% } %>
-      </button>
-      <div class="nav-user-dropdown" role="menu">
-        <a href="/perfil" role="menuitem">Mi Perfil</a>
-        <a href="/logout" role="menuitem">Cerrar Sesión</a>
-      </div>
+        <span>Mi perfil</span>
+      </a>
+      <a href="/logout" class="mobile-sidebar__logout">Cerrar sesión</a>
     </div>
   <% } %>
 </nav>
@@ -112,6 +114,7 @@
         <div class="dropdown-menu">
           <a href="/RRHH/organigrama">Organigrama</a>
           <a href="/RRHH/personal">Personal</a>
+          <a href="/RRHH/vacaciones">Vacaciones</a>
           <a href="https://transworld.mirexmas.com/" target="_blank" rel="noopener noreferrer">Rex+</a>
           <a href="https://www.achs.cl/" target="_blank" rel="noopener noreferrer">ACHS</a>
           <a href="https://www.cajalosandes.cl/" target="_blank" rel="noopener noreferrer">Caja los Andes</a>
@@ -175,7 +178,7 @@
 
 <% if (currentUser) { %>
 <div id="modalNuevoTicketNavbar" class="modal-overlay modal-ticket-navbar" role="dialog" aria-modal="true" aria-labelledby="ticket-modal-title" aria-hidden="true">
-  <div class="modal-content modal-ticket-navbar-content">
+  <div class="modal-content modal-ticket-navbar-content modal-content--layout">
     <button type="button" class="ticket-modal-close" aria-label="Cerrar modal de ticket" data-ticket-modal-close>&times;</button>
     <h3 id="ticket-modal-title" class="ticket-modal-title">Abrir Nuevo Ticket de Soporte</h3>
     <p class="ticket-modal-description">Describe tu problema o requerimiento tecnico a continuacion.</p>
@@ -183,7 +186,7 @@
     <div class="ticket-modal-user-box">
       <p>
         <strong>Solicitante:</strong>
-        <%= currentUser ? (currentUser.username || displayName) : 'Usuario' %>
+        <%= currentUser ? displayName : 'Usuario' %>
         <span>(<%= currentUser && currentUser.email ? currentUser.email : 'Sin correo' %>)</span>
       </p>
     </div>
@@ -254,7 +257,7 @@
 
     <div class="footer-col">
       <strong>Ayuda</strong>
-      <a href="/sistemas/tickets">Ticketera de Soporte</a>
+      <a href="/sistemas/tickets">Soporte de TI</a>
     </div>
 
     <div class="footer-col">

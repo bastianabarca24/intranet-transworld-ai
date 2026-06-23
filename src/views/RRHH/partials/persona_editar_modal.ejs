@@ -89,6 +89,28 @@
 
       <div class="form-grid-2">
         <div class="campo">
+          <label for="employment_country">País de contrato *</label>
+          <% const pais = (persona.employment_country || 'CL'); %>
+          <select id="employment_country" name="employment_country" required>
+            <option value="CL" <%= pais === 'CL' ? 'selected' : '' %>>🇨🇱 Chile</option>
+            <option value="PE" <%= pais === 'PE' ? 'selected' : '' %>>🇵🇪 Perú</option>
+          </select>
+          <span class="hint">Determina las reglas de vacaciones.</span>
+        </div>
+        <div class="campo">
+          <label for="hire_date">Fecha de ingreso</label>
+          <input
+            type="date"
+            id="hire_date"
+            name="hire_date"
+            value="<%= persona.hire_date ? new Date(persona.hire_date).toISOString().split('T')[0] : '' %>"
+          >
+          <span class="hint">Necesaria para calcular vacaciones.</span>
+        </div>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="campo">
           <label for="fecha_nacimiento" id="fecha_nacimiento_label">Fecha de Nacimiento<%= tieneCorreoRegistrado ? '' : ' *' %></label>
           <input
             type="date"

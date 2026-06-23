@@ -29,7 +29,7 @@
 </style>
 <div class="contenedor">
   <div style="margin-bottom: 20px;">
-    <a href="/sistemas/tickets" class="link-volver">← Volver a la Ticketera</a>
+    <a href="/sistemas/tickets" class="link-volver">← Volver a la Soporte de TI</a>
   </div>
 
   <h2 class="page-title">Abrir Nuevo Ticket de Soporte</h2>
@@ -40,8 +40,8 @@
       
       <div style="background: #f0f4fb; padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dde3ec;">
         <p style="margin: 0; font-size: 0.9rem; color: #555;">
-          <strong>Solicitante:</strong> <%= usuario.username %> 
-          <span style="margin-left: 10px; color: #003a70;">(<%= usuario.email %>)</span>
+          <strong>Solicitante:</strong> <%= usuario.nombre || usuario.username || 'Usuario' %>
+          <span style="margin-left: 10px; color: #003a70;">(<%= usuario.email || 'Sin correo' %>)</span>
         </p>
       </div>
 

@@ -78,6 +78,55 @@
     notice.setAttribute("aria-hidden", "false");
   }
 
+  function getApp() {
+    return document.getElementById("claudeApp");
+  }
+
+  function isMobileSidebarLayout() {
+    return window.matchMedia("(max-width: 820px)").matches;
+  }
+
+  function setSidebarOpen(open) {
+    const app = getApp();
+    const toggle = document.getElementById("btnSidebarToggle");
+    const backdrop = document.getElementById("claudeSidebarBackdrop");
+    if (!app) return;
+
+    app.classList.toggle("is-sidebar-open", open);
+    toggle?.setAttribute("aria-expanded", open ? "true" : "false");
+
+    if (backdrop) {
+      if (open && isMobileSidebarLayout()) {
+        backdrop.hidden = false;
+        backdrop.setAttribute("aria-hidden", "false");
+      } else {
+        backdrop.hidden = true;
+        backdrop.setAttribute("aria-hidden", "true");
+      }
+    }
+  }
+
+  function closeSidebar() {
+    setSidebarOpen(false);
+  }
+
+  function initMobileSidebar() {
+    const toggle = document.getElementById("btnSidebarToggle");
+    const backdrop = document.getElementById("claudeSidebarBackdrop");
+
+    toggle?.addEventListener("click", () => {
+      const app = getApp();
+      if (!app) return;
+      setSidebarOpen(!app.classList.contains("is-sidebar-open"));
+    });
+
+    backdrop?.addEventListener("click", closeSidebar);
+
+    window.addEventListener("resize", () => {
+      if (!isMobileSidebarLayout()) closeSidebar();
+    });
+  }
+
   async function openClaudeModal() {
     const overlay = getOverlay();
     if (!overlay) return;
@@ -100,6 +149,7 @@
       overlay.style.display = "flex";
       overlay.classList.add("is-open");
       overlay.setAttribute("aria-hidden", "false");
+      document.documentElement.classList.add("modal-open");
       document.body.classList.add("modal-open");
     }
 
@@ -112,6 +162,7 @@
   }
 
   function closeClaudeModal() {
+    closeSidebar();
     const overlay = getOverlay();
     if (!overlay) return;
 
@@ -127,7 +178,9 @@
       overlay.classList.remove("is-open");
       overlay.style.display = "none";
       overlay.setAttribute("aria-hidden", "true");
+      document.documentElement.classList.remove("modal-open");
       document.body.classList.remove("modal-open");
+      document.body.style.top = "";
     }
   }
 
@@ -154,6 +207,7 @@
   });
 
   document.addEventListener("DOMContentLoaded", () => {
+    initMobileSidebar();
     document.getElementById("claudeModalClose")?.addEventListener("click", closeClaudeModal);
 
     if (shouldAutoOpen()) {
@@ -162,5 +216,5 @@
     }
   });
 
-  window.ClaudeModal = { open: openClaudeModal, close: closeClaudeModal };
+  window.ClaudeModal = { open: openClaudeModal, close: closeClaudeModal, closeSidebar };
 })();

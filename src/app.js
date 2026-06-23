@@ -27,6 +27,8 @@ const { ROLES, normalizeRole, isAdministrador } = require("./constants/roles");
 const { formatPageTitle } = require("./utils/pageTitle");
 const { syncUnverifiedUsersToDisabled } = require("./utils/syncDisabledUsers");
 const sharepointService = require("./services/sharepointService");
+const { ensureVacationSchema } = require("./services/vacations/vacationSchema");
+const vacationRequestService = require("./services/vacations/vacationRequestService");
 
 // ================================
 // Inicializar app
@@ -129,6 +131,9 @@ app.use((req, res, next) => {
       tickets_reply: isAdministrador(role),
       apps_write: isAdministrador(role),
       cursos_write: isAdministrador(role),
+      vacaciones_write: isAdministrador(role),
+      vacaciones_request:
+        role === ROLES.USUARIO || isAdministrador(role),
     };
     res.locals.unreadTickets = req.session.ticketNotifications?.count || 0;
   } else {
@@ -233,6 +238,29 @@ function iniciarLimpiezaHistorial() {
   setInterval(ejecutarLimpieza, 43200000);
 }
 
+// ==========================================
+// TAREA 3: TRANSICIONES DE ESTADO DE VACACIONES
+// ==========================================
+function iniciarTransicionesVacaciones() {
+  const ejecutar = async () => {
+    try {
+      const { inProgress, completed } =
+        await vacationRequestService.runDailyStatusTransitions();
+      if (inProgress > 0 || completed > 0) {
+        console.log(
+          `[CRON] Vacaciones: ${inProgress} en curso, ${completed} completadas.`,
+        );
+      }
+    } catch (err) {
+      console.error("[CRON] Error en transiciones de vacaciones:", err.message);
+    }
+  };
+
+  ejecutar();
+  // Cada 12 horas
+  setInterval(ejecutar, 43200000);
+}
+
 // ================================
 // INICIAR CRON JOBS
 // ================================
@@ -290,11 +318,25 @@ async function asegurarColumnaNoticiasDestacada() {
 // ================================
 // INICIAR SERVIDOR
 // ================================
+async function asegurarSchemaVacaciones() {
+  try {
+    await ensureVacationSchema();
+  } catch (err) {
+    console.error(
+      "[Vacaciones] No se pudo asegurar el schema del módulo:",
+      err.message,
+    );
+  }
+}
+
 Promise.allSettled([
   asegurarCorreoUnico(),
   asegurarColumnaNoticiasDestacada(),
   sincronizarUsuariosDeshabilitados(),
+  asegurarSchemaVacaciones(),
 ]).finally(() => {
+  // El cron de vacaciones se inicia tras asegurar el schema.
+  iniciarTransicionesVacaciones();
   app.listen(PORT, () => {
     console.log(`Servidor de Intranet corriendo en puerto ${PORT}`);
   });

@@ -611,6 +611,7 @@ class ClaudeChat {
   }
 
   newConversation() {
+    window.ClaudeModal?.closeSidebar?.();
     this.currentConversationId = null;
     this.uploadedFilenamesInConversation = [];
     this.clearAttachments();
@@ -636,6 +637,7 @@ class ClaudeChat {
 
   async loadConversation(convId) {
     if (this.isStreaming) return;
+    window.ClaudeModal?.closeSidebar?.();
     this.currentConversationId = convId;
     this.thread.innerHTML = "";
     this.welcome = null;

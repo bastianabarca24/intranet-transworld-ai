@@ -50,6 +50,22 @@
     </div>
   </div>
 
+  <div class="modal-form-grid-2">
+    <div class="campo">
+      <label for="crear_employment_country">País de contrato <span class="required-mark">*</span></label>
+      <select id="crear_employment_country" name="employment_country" required>
+        <option value="CL" selected>🇨🇱 Chile</option>
+        <option value="PE">🇵🇪 Perú</option>
+      </select>
+      <span class="hint">Determina las reglas de vacaciones aplicables.</span>
+    </div>
+    <div class="campo">
+      <label for="crear_hire_date">Fecha de ingreso</label>
+      <input type="date" id="crear_hire_date" name="hire_date">
+      <span class="hint">Necesaria para calcular el saldo de vacaciones.</span>
+    </div>
+  </div>
+
   <div class="modal-form-actions">
     <button type="button" class="btn-modal-cancelar" onclick="cerrarModalCrear()">Cancelar</button>
     <button type="submit" class="btn-modal-guardar">Guardar Colaborador</button>

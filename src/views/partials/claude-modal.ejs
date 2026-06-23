@@ -11,6 +11,8 @@
     aria-labelledby="claudeModalTitle"
   >
     <div class="claude-app claude-app--modal" id="claudeApp">
+      <div class="claude-sidebar-backdrop" id="claudeSidebarBackdrop" hidden aria-hidden="true"></div>
+
       <aside class="claude-sidebar" id="claudeSidebar">
         <div class="sidebar-top">
           <button class="btn-new-chat" id="btnNewChat" type="button">
@@ -26,6 +28,23 @@
       </aside>
 
       <main class="claude-main">
+        <div class="claude-mobile-bar">
+          <button
+            type="button"
+            class="claude-sidebar-toggle"
+            id="btnSidebarToggle"
+            aria-label="Ver conversaciones"
+            aria-expanded="false"
+            aria-controls="claudeSidebar"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
+          <span class="claude-mobile-bar-title" id="claudeModalTitle">Asistente IA</span>
+          <button type="button" class="claude-modal-close" id="claudeModalClose" aria-label="Cerrar asistente">&times;</button>
+        </div>
+
         <div class="chat-scroll" id="chatScroll">
           <div class="chat-thread" id="chatThread">
             <div class="welcome-section" id="welcomeSection">

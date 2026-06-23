@@ -49,4 +49,7 @@ pool.on("connect", () => {
 
 module.exports = {
   query: (text, params) => pool.query(text, params),
+  // Necesario para transacciones (ej. aprobación de vacaciones con FOR UPDATE)
+  getClient: () => pool.connect(),
+  pool,
 };

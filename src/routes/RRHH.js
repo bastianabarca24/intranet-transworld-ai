@@ -6,6 +6,10 @@ const crypto = require("crypto");
 const fileStorage = require("../services/fileStorage");
 const userPhotoStorage = require("../services/userPhotoStorage");
 const { ROLES, ALL_ROLES } = require("../constants/roles");
+const {
+  getWorkAreaPillClass,
+  enrichAreaWithPill,
+} = require("../constants/workAreas");
 
 function parseRoleFromForm(role) {
   const value = String(role || "").trim();
@@ -22,6 +26,11 @@ const {
 const { validateEmail } = require("../utils/email");
 const { mapPersonaForView } = require("../utils/schemaMappers");
 const { generateUniqueUsuarioId } = require("../utils/userId");
+const balanceService = require("../services/vacations/vacationBalanceService");
+
+function parseEmploymentCountry(value) {
+  return String(value || "").toUpperCase() === "PE" ? "PE" : "CL";
+}
 
 function redirectPersonalCrearError(res, message) {
   return res.redirect(
@@ -110,9 +119,9 @@ function enviarClaveTemporal(email, firstName, passwordTemporal) {
 
 async function getAreasTrabajo() {
   const { rows } = await db.query(
-    "SELECT id, area_name AS nombre_area FROM work_areas ORDER BY area_name ASC",
+    "SELECT id, area_name FROM work_areas ORDER BY area_name ASC",
   );
-  return rows;
+  return rows.map(enrichAreaWithPill);
 }
 
 // ==========================================
@@ -194,16 +203,14 @@ router.get("/personal", async (req, res) => {
       ? decodeURIComponent(req.query.editarError)
       : null;
 
-    let areas = [];
-    if (res.locals.isAdministrador) {
-      areas = await getAreasTrabajo();
-    }
+    const areas = await getAreasTrabajo();
 
     res.render("RRHH/personal", {
       titulo: "Personal",
       personas: personasFormateadas,
       areas,
       mostrarColumnaRol,
+      getWorkAreaPillClass,
       user: req.session.user,
       success: successMsg,
       error: null,
@@ -231,27 +238,31 @@ router.post("/crear", requireRole.administrador(), async (req, res) => {
     first_name,
     last_name,
     email,
-    area_trabajo_id,
-    fecha_nacimiento,
-    telefono,
+    work_area_id,
+    birth_date,
+    phone,
+    employment_country,
+    hire_date,
   } = req.body;
 
   try {
+    const countryVal = parseEmploymentCountry(employment_country);
+    const hireVal = hire_date && String(hire_date).trim() ? hire_date : null;
     const emailRaw =
       email && typeof email === "string" ? email.trim() : "";
     const emailCheck = emailRaw
       ? validateEmail(emailRaw)
       : { valid: true, value: null };
     const emailClean = emailCheck.value;
-    const areaId = (area_trabajo_id && String(area_trabajo_id).trim()) ? Number(area_trabajo_id) : null;
-    const telefonoCheck = (telefono && typeof telefono === 'string' && telefono.trim()) ? validateChileMobilePhone(telefono) : { valid: true, value: null, storageValue: null };
+    const areaId = (work_area_id && String(work_area_id).trim()) ? Number(work_area_id) : null;
+    const telefonoCheck = (phone && typeof phone === 'string' && phone.trim()) ? validateChileMobilePhone(phone) : { valid: true, value: null, storageValue: null };
     const telefonoVal = telefonoCheck.storageValue;
 
     const firstName = (first_name && typeof first_name === 'string') ? toTitleCase(first_name.trim()) : '';
     const lastName = (last_name && typeof last_name === 'string') ? toTitleCase(last_name.trim()) : '';
     const fechaVal =
-      fecha_nacimiento && String(fecha_nacimiento).trim()
-        ? fecha_nacimiento
+      birth_date && String(birth_date).trim()
+        ? birth_date
         : null;
 
     if (!firstName || !lastName || !areaId) {
@@ -299,8 +310,8 @@ router.post("/crear", requireRole.administrador(), async (req, res) => {
 
       await db.query(
         `INSERT INTO users
-          (id, first_name, last_name, email, password_hash, password_salt, role, email_confirmed, must_change_password, work_area_id, birth_date, phone, is_intranet_user, home_tutorial_seen)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, TRUE, $8, $9, $10, TRUE, FALSE)`,
+          (id, first_name, last_name, email, password_hash, password_salt, role, email_confirmed, must_change_password, work_area_id, birth_date, phone, is_intranet_user, home_tutorial_seen, employment_country, hire_date)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, TRUE, $8, $9, $10, TRUE, FALSE, $11, $12)`,
         [
           userId,
           firstName,
@@ -312,6 +323,8 @@ router.post("/crear", requireRole.administrador(), async (req, res) => {
           areaId,
           fechaVal,
           telefonoVal,
+          countryVal,
+          hireVal,
         ],
       );
 
@@ -321,8 +334,8 @@ router.post("/crear", requireRole.administrador(), async (req, res) => {
     } else {
       await db.query(
         `INSERT INTO users
-          (id, first_name, last_name, email, role, email_confirmed, must_change_password, work_area_id, birth_date, phone, is_intranet_user)
-        VALUES ($1, $2, $3, $4, $5, FALSE, FALSE, $6, $7, $8, FALSE)`,
+          (id, first_name, last_name, email, role, email_confirmed, must_change_password, work_area_id, birth_date, phone, is_intranet_user, employment_country, hire_date)
+        VALUES ($1, $2, $3, $4, $5, FALSE, FALSE, $6, $7, $8, FALSE, $9, $10)`,
         [
           userId,
           firstName,
@@ -332,8 +345,17 @@ router.post("/crear", requireRole.administrador(), async (req, res) => {
           areaId,
           fechaVal,
           telefonoVal,
+          countryVal,
+          hireVal,
         ],
       );
+    }
+
+    // Genera los períodos de vacaciones si se registró fecha de ingreso.
+    if (hireVal) {
+      balanceService
+        .recalculatePeriods(userId)
+        .catch((e) => console.error("[Vacaciones] recalc al crear:", e.message));
     }
 
     res.redirect(`/RRHH/personal?ok=1&msg=${successMsg}`);
@@ -373,6 +395,7 @@ router.get("/editar/:id", requireRole.administrador(), async (req, res) => {
         layout: false,
         persona,
         areas,
+        getWorkAreaPillClass,
       });
     }
 
@@ -393,16 +416,20 @@ router.post(
       first_name,
       last_name,
       role,
-      area_trabajo_id,
-      fecha_nacimiento,
-      telefono,
+      work_area_id,
+      birth_date,
+      phone,
       email,
       eliminar_foto,
+      employment_country,
+      hire_date,
     } = req.body;
 
     try {
-      const areaId = (area_trabajo_id && String(area_trabajo_id).trim()) ? Number(area_trabajo_id) : null;
-      const telefonoCheck = (telefono && typeof telefono === 'string' && telefono.trim()) ? validateChileMobilePhone(telefono) : { valid: true, value: null, storageValue: null };
+      const countryVal = parseEmploymentCountry(employment_country);
+      const hireVal = hire_date && String(hire_date).trim() ? hire_date : null;
+      const areaId = (work_area_id && String(work_area_id).trim()) ? Number(work_area_id) : null;
+      const telefonoCheck = (phone && typeof phone === 'string' && phone.trim()) ? validateChileMobilePhone(phone) : { valid: true, value: null, storageValue: null };
       const telefonoVal = telefonoCheck.storageValue;
       const firstName = (first_name && typeof first_name === 'string') ? toTitleCase(first_name.trim()) : '';
       const lastName = (last_name && typeof last_name === 'string') ? toTitleCase(last_name.trim()) : '';
@@ -413,8 +440,8 @@ router.post(
         : { valid: true, value: null };
       const emailClean = emailCheck.value;
       const fechaVal =
-        fecha_nacimiento && String(fecha_nacimiento).trim()
-          ? fecha_nacimiento
+        birth_date && String(birth_date).trim()
+          ? birth_date
           : null;
 
       if (!firstName || !lastName || !areaId) {
@@ -499,6 +526,8 @@ router.post(
         "birth_date=$5",
         "phone=$6",
         "email=$7",
+        "employment_country=$8",
+        "hire_date=$9",
       ];
       const values = [
         firstName,
@@ -508,6 +537,8 @@ router.post(
         fechaVal,
         telefonoVal,
         emailClean,
+        countryVal,
+        hireVal,
       ];
 
       if (fotoValue !== undefined) {
@@ -551,6 +582,13 @@ router.post(
 
       if (passwordTemporalNueva) {
         await enviarClaveTemporal(emailClean, firstName, passwordTemporalNueva);
+      }
+
+      // Recalcula períodos de vacaciones si hay fecha de ingreso.
+      if (hireVal) {
+        balanceService
+          .recalculatePeriods(id)
+          .catch((e) => console.error("[Vacaciones] recalc al editar:", e.message));
       }
 
       res.redirect(`/RRHH/personal?ok=1&msg=${successMsg}`);
@@ -652,5 +690,9 @@ router.post(
     }
   },
 );
+
+// Sub-módulo de vacaciones montado bajo /RRHH/vacaciones
+const vacationsRouter = require("./vacations");
+router.use("/vacaciones", vacationsRouter);
 
 module.exports = router;

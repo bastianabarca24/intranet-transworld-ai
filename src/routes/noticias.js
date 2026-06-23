@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db'); 
 const fileStorage = require('../services/fileStorage');
 const requireRole = require('../middlewares/requireRole');
+const { isAdministrador } = require('../constants/roles');
 const multer = require('multer');
 const { sendMail } = require('../services/mailer');
 const { NOTICIA_VIEW_COLUMNS } = require('../utils/schemaMappers');
@@ -42,6 +43,16 @@ function createSlug(text) {
 }
 
 function buildNoticiaEmailHtml(noticia) {
+  const baseUrl = process.env.APP_BASE_URL || 'https://intranet.transworld.cl';
+
+  // Los archivos se guardan con rutas relativas (/content/...). En un correo
+  // deben ser absolutas para que el cliente de correo las pueda cargar.
+  const toAbsolute = (url) => {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url)) return url;
+    return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
   let adjuntosCorreo = [];
   try {
     if (noticia.attachments) {
@@ -53,60 +64,149 @@ function buildNoticiaEmailHtml(noticia) {
   } catch (e) {}
 
   const imagenesCorreo = adjuntosCorreo.filter(
-    (a) => a.tipo === 'image' || (a.resource_type === 'image' && a.tipo !== 'video'),
+    (a) => a.tipo === 'image' || (a.resource_type === 'image' && a.tipo !== 'video' && a.tipo !== 'document'),
   );
 
-  const imagenPortadaHtml = noticia.image
-    ? `<img src="${noticia.image}" alt="Portada" style="width:100%; max-height:380px; object-fit:cover; display:block; margin-bottom:0;">`
-    : '';
+  const documentosCorreo = adjuntosCorreo.filter(
+    (a) => a.tipo === 'document' || (a.resource_type === 'raw' && a.tipo !== 'image' && a.tipo !== 'video'),
+  );
 
   const galeriaHtml =
     imagenesCorreo.length > 0
-      ? `<div style="margin: 20px 0 10px 0;">
-           <p style="color:#003a70; font-weight:700; font-size:15px; margin:0 0 10px 0;">Imágenes adjuntas</p>
-           <div style="text-align: left;">
+      ? `<tr><td style="padding: 0 32px 8px 32px;">
+           <p style="color:#003a70; font-weight:700; font-size:14px; text-transform:uppercase; letter-spacing:0.5px; margin:24px 0 12px 0;">Imágenes adjuntas</p>
+           <div style="text-align: left; font-size:0;">
              ${imagenesCorreo
                .map(
                  (img) =>
-                   `<a href="${img.url}" target="_blank" style="display:inline-block; margin: 4px; vertical-align: top;"><img src="${img.url}" alt="${img.nombre || 'Imagen'}" style="width: 60px; height: auto; border-radius:6px; border:1px solid #e2e8f0; display:block;"></a>`,
+                   `<a href="${toAbsolute(img.url)}" target="_blank" style="display:inline-block; margin:0 8px 8px 0; vertical-align: top;"><img src="${toAbsolute(img.url)}" alt="${img.nombre || 'Imagen'}" width="72" style="width:72px; height:72px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; display:block;"></a>`,
                )
                .join('')}
            </div>
-         </div>`
+         </td></tr>`
       : '';
 
+  const documentosHtml =
+    documentosCorreo.length > 0
+      ? `<tr><td style="padding: 0 32px 8px 32px;">
+           <p style="color:#003a70; font-weight:700; font-size:14px; text-transform:uppercase; letter-spacing:0.5px; margin:24px 0 12px 0;">Documentos adjuntos</p>
+           ${documentosCorreo
+             .map(
+               (doc) =>
+                 `<a href="${toAbsolute(doc.url)}" target="_blank" style="display:block; margin:0 0 8px 0; padding:12px 16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; text-decoration:none; color:#003a70; font-weight:600; font-size:14px;">📄&nbsp;&nbsp;${doc.nombre || 'Documento'}</a>`,
+             )
+             .join('')}
+         </td></tr>`
+      : '';
+
+  const subtituloHtml = noticia.subtitle
+    ? `<tr><td style="padding: 0 32px;">
+         <p style="color:#475569; font-size:17px; font-weight:500; line-height:1.5; margin:0 0 4px 0;">${noticia.subtitle}</p>
+       </td></tr>`
+    : '';
+
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
-      <div style="background-color: #003a70; padding: 20px; text-align: center;">
-        <h2 style="color: white; margin: 0;">Nueva Noticia en Transworld</h2>
-      </div>
-      ${imagenPortadaHtml}
-      <div style="padding: 25px; background-color: #ffffff;">
-        <h3 style="color: #003a70; margin-top: 0; font-size: 22px;">${noticia.title}</h3>
-        ${noticia.subtitle ? `<p style="color: #475569; font-size: 16px; font-weight: bold;">${noticia.subtitle}</p>` : ''}
-        <div style="color: #334155; font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
-          ${noticia.content}
-        </div>
+    <div style="background-color:#eef2f7; padding:32px 16px; font-family: Arial, Helvetica, sans-serif;">
+      <table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; width:100%; margin:0 auto; background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(0,58,112,0.08);">
+        <!-- Encabezado -->
+        <tr>
+          <td style="background-color:#003a70; padding:28px 32px;">
+            <p style="color:#9cc3ee; font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin:0 0 6px 0;">Intranet Transworld</p>
+            <h1 style="color:#ffffff; font-size:20px; font-weight:800; margin:0;">📰 Nueva noticia publicada</h1>
+          </td>
+        </tr>
+
+        <!-- Título -->
+        <tr>
+          <td style="padding: 32px 32px 0 32px;">
+            <h2 style="color:#003a70; font-size:25px; font-weight:800; line-height:1.25; margin:0 0 10px 0;">${noticia.title}</h2>
+          </td>
+        </tr>
+        ${subtituloHtml}
+
+        <!-- Separador -->
+        <tr><td style="padding: 20px 32px 0 32px;"><div style="border-top:1px solid #e2e8f0; height:1px; line-height:1px; font-size:1px;">&nbsp;</div></td></tr>
+
+        <!-- Contenido -->
+        <tr>
+          <td style="padding: 20px 32px 8px 32px; color:#334155; font-size:15px; line-height:1.7;">
+            ${noticia.content}
+          </td>
+        </tr>
+
         ${galeriaHtml}
-        <div style="text-align: center; margin-top: 30px; margin-bottom: 10px;">
-          <a href="${process.env.APP_BASE_URL || 'http://localhost:3000'}/noticias/${noticia.id}"
-             style="display: inline-block; background-color: #ffffff; color: #003a70; border: 3px solid #003a70; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-            Leer en la Intranet
-          </a>
-        </div>
-      </div>
-      <div style="background-color: #f8fafc; padding: 15px; text-align: center; border-top: 1px solid #e0e0e0;">
-        <p style="color: #94a3b8; font-size: 12px; margin: 0;">Este es un mensaje de la Intranet Transworld, por favor no respondas a este correo.</p>
-      </div>
+        ${documentosHtml}
+
+        <!-- CTA -->
+        <tr>
+          <td style="padding: 28px 32px 36px 32px;" align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="border-radius:8px; background-color:#003a70;">
+                  <a href="${baseUrl}/noticias/${noticia.id}" target="_blank"
+                     style="display:inline-block; padding:14px 36px; color:#ffffff; font-size:16px; font-weight:700; text-decoration:none; border-radius:8px;">
+                    Leer en la Intranet →
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Pie -->
+        <tr>
+          <td style="background-color:#f8fafc; padding:18px 32px; border-top:1px solid #e2e8f0;" align="center">
+            <p style="color:#94a3b8; font-size:12px; line-height:1.5; margin:0;">Este es un mensaje automático de la Intranet Transworld. Por favor, no respondas a este correo.</p>
+          </td>
+        </tr>
+      </table>
     </div>
   `;
 }
 
-async function enviarCorreoNoticia(noticia) {
-  const { rows: usuarios } = await db.query(
-    "SELECT email FROM users WHERE email IS NOT NULL AND email != ''",
+async function listarUsuariosConCorreo() {
+  const { rows } = await db.query(`
+    SELECT
+      u.id,
+      u.first_name,
+      u.last_name,
+      u.email,
+      at.area_name AS area
+    FROM users u
+    LEFT JOIN work_areas at ON at.id = u.work_area_id
+    WHERE u.email IS NOT NULL AND TRIM(u.email) <> ''
+    ORDER BY u.last_name ASC NULLS LAST, u.first_name ASC
+  `);
+  return rows;
+}
+
+async function obtenerCorreosDestinatarios({ enviarTodos, userIds }) {
+  if (enviarTodos) {
+    const { rows } = await db.query(
+      "SELECT email FROM users WHERE email IS NOT NULL AND TRIM(email) <> ''",
+    );
+    return rows.map((u) => u.email);
+  }
+
+  const ids = (Array.isArray(userIds) ? userIds : [userIds])
+    .map((id) => parseInt(id, 10))
+    .filter((id) => Number.isInteger(id) && id > 0);
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const { rows } = await db.query(
+    `SELECT email FROM users
+     WHERE id = ANY($1::int[])
+       AND email IS NOT NULL AND TRIM(email) <> ''`,
+    [ids],
   );
-  const listaCorreos = usuarios.map((u) => u.email);
+  return rows.map((u) => u.email);
+}
+
+async function enviarCorreoNoticia(noticia, opciones = {}) {
+  const listaCorreos = await obtenerCorreosDestinatarios(opciones);
 
   if (listaCorreos.length === 0) {
     return { enviados: 0 };
@@ -119,7 +219,7 @@ async function enviarCorreoNoticia(noticia) {
     html: buildNoticiaEmailHtml(noticia),
   });
 
-  console.log(`Notificación de noticia enviada a ${listaCorreos.length} trabajadores.`);
+  console.log(`Notificación de noticia enviada a ${listaCorreos.length} trabajador(es).`);
   return { enviados: listaCorreos.length };
 }
 
@@ -144,11 +244,9 @@ router.get('/', async (req, res) => {
 // ==========================================
 // 2. FORMULARIO DE CREACIÓN NOTICIA
 // ==========================================
+// La creación ahora se realiza mediante un modal en /noticias (index).
 router.get('/crear', requireRole(...ROLES_CREAR), (req, res) => {
-  res.render('noticias/crear', { 
-    titulo: 'Publicar Noticia',
-    user: req.session.user 
-  });
+  res.redirect('/noticias');
 });
 
 // ==========================================
@@ -313,6 +411,11 @@ router.post('/destacar/:id', requireRole(...ROLES_CREAR), async (req, res) => {
 // ==========================================
 router.post('/enviar-correo/:id', requireRole(...ROLES_CREAR), async (req, res) => {
   const { id } = req.params;
+  const enviarTodos =
+    req.body.enviar_todos === '1' ||
+    req.body.enviar_todos === 'true' ||
+    req.body.enviar_todos === 'on';
+  const userIds = req.body.usuarios;
 
   try {
     const { rows } = await db.query(`SELECT ${NOTICIA_VIEW_COLUMNS} FROM news_articles WHERE id = $1`, [id]);
@@ -321,7 +424,11 @@ router.post('/enviar-correo/:id', requireRole(...ROLES_CREAR), async (req, res) 
       return res.status(404).send('Noticia no encontrada');
     }
 
-    const resultado = await enviarCorreoNoticia(rows[0]);
+    if (!enviarTodos && (!userIds || (Array.isArray(userIds) && userIds.length === 0))) {
+      return res.redirect(`/noticias/${id}?error=sin_seleccion`);
+    }
+
+    const resultado = await enviarCorreoNoticia(rows[0], { enviarTodos, userIds });
 
     if (req.session.user) {
       await db.query(
@@ -369,11 +476,18 @@ router.get('/:id_or_slug', async (req, res) => {
       return res.status(404).render('404', { titulo: 'Noticia no encontrada', user: req.session.user });
     }
 
+    let usuariosCorreo = [];
+    if (isAdministrador(req.session.user?.role)) {
+      usuariosCorreo = await listarUsuariosConCorreo();
+    }
+
     res.render('noticias/detalle', { 
       titulo: rows[0].title, 
       noticia: rows[0],
       user: req.session.user,
+      usuariosCorreo,
       publicada: req.query.publicada === '1',
+      editar: req.query.editar === '1',
       ok: req.query.ok || null,
       error: req.query.error || null,
       destinatarios: req.query.destinatarios || null,
@@ -385,26 +499,10 @@ router.get('/:id_or_slug', async (req, res) => {
 });
 
 // ==========================================
-// FORMULARIO DE EDICIÓN
+// FORMULARIO DE EDICIÓN (redirige al detalle con modal)
 // ==========================================
-router.get('/editar/:id', requireRole(...ROLES_CREAR), async (req, res) => {
-  const { id } = req.params;
-  try {
-    const { rows } = await db.query(`SELECT ${NOTICIA_VIEW_COLUMNS} FROM news_articles WHERE id = $1`, [id]);
-    
-    if (rows.length === 0) {
-      return res.status(404).send('Noticia no encontrada');
-    }
-
-    res.render('noticias/editar-noticia', { 
-      titulo: 'Editar Noticia',
-      noticia: rows[0],
-      user: req.session.user 
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Error cargando la vista de edición');
-  }
+router.get('/editar/:id', requireRole(...ROLES_CREAR), (req, res) => {
+  res.redirect(`/noticias/${req.params.id}?editar=1`);
 });
 
 // ==========================================

@@ -1,5 +1,7 @@
 (function (global) {
   const ANIM_MS = 280;
+  let scrollLockCount = 0;
+  let savedScrollY = 0;
 
   function resolve(el) {
     if (!el) return null;
@@ -15,6 +17,44 @@
     );
   }
 
+  function hasBlockingOverlay() {
+    return !!document.querySelector(
+      '.modal-overlay.is-open, .modal-imagen.is-open, .foto-crop-overlay.is-open',
+    );
+  }
+
+  function lockScroll() {
+    if (scrollLockCount === 0) {
+      savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
+      document.body.style.top = `-${savedScrollY}px`;
+    }
+    scrollLockCount += 1;
+  }
+
+  function unlockScroll() {
+    if (scrollLockCount <= 0) return;
+    scrollLockCount -= 1;
+    if (scrollLockCount > 0) return;
+
+    document.documentElement.classList.remove('modal-open');
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    window.scrollTo(0, savedScrollY);
+  }
+
+  function syncScrollLock() {
+    if (hasBlockingOverlay()) {
+      if (scrollLockCount === 0) lockScroll();
+      return;
+    }
+    if (scrollLockCount > 0) {
+      scrollLockCount = 1;
+      unlockScroll();
+    }
+  }
+
   function isOpen(overlay) {
     return overlay && overlay.classList.contains('is-open');
   }
@@ -26,7 +66,7 @@
     overlay.classList.remove('is-closing');
     overlay.style.display = 'flex';
     overlay.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('modal-open');
+    lockScroll();
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => overlay.classList.add('is-open'));
@@ -41,9 +81,7 @@
         overlay.classList.remove('is-open', 'is-closing');
         overlay.setAttribute('aria-hidden', 'true');
       }
-      if (!document.querySelector('.modal-overlay.is-open, .modal-imagen.is-open')) {
-        document.body.classList.remove('modal-open');
-      }
+      syncScrollLock();
       return;
     }
 
@@ -54,9 +92,7 @@
       overlay.style.display = 'none';
       overlay.classList.remove('is-closing');
       overlay.setAttribute('aria-hidden', 'true');
-      if (!document.querySelector('.modal-overlay.is-open, .modal-imagen.is-open')) {
-        document.body.classList.remove('modal-open');
-      }
+      syncScrollLock();
     };
 
     const panel = getPanel(overlay);
@@ -94,7 +130,7 @@
     });
   }
 
-  global.IntranetModal = { open, close, isOpen, ANIM_MS };
+  global.IntranetModal = { open, close, isOpen, lockScroll, unlockScroll, ANIM_MS };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bindOverlayDismiss);

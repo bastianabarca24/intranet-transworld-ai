@@ -71,8 +71,10 @@ h2.page-title {
 
 .modal-overlay > .modal-content,
 .modal-overlay > .modal-content2,
+.modal-overlay > .modal-ticket-navbar-content,
 .modal-imagen > .modal-imagen-contenido {
   transform: translateY(18px) scale(0.96);
+  transform-origin: center center;
   opacity: 0;
   transition:
     transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
@@ -82,6 +84,7 @@ h2.page-title {
 
 .modal-overlay.is-open > .modal-content,
 .modal-overlay.is-open > .modal-content2,
+.modal-overlay.is-open > .modal-ticket-navbar-content,
 .modal-imagen.is-open > .modal-imagen-contenido {
   transform: translateY(0) scale(1);
   opacity: 1;
@@ -89,6 +92,7 @@ h2.page-title {
 
 .modal-overlay.is-closing > .modal-content,
 .modal-overlay.is-closing > .modal-content2,
+.modal-overlay.is-closing > .modal-ticket-navbar-content,
 .modal-imagen.is-closing > .modal-imagen-contenido {
   transform: translateY(12px) scale(0.98);
   opacity: 0;
@@ -97,6 +101,17 @@ h2.page-title {
 .modal-imagen {
   opacity: 0;
   transition: opacity 0.28s ease;
+  box-sizing: border-box;
+  padding: 15px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.modal-imagen > .modal-imagen-contenido {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  margin-inline: auto;
 }
 
 .modal-imagen.is-open {
@@ -109,6 +124,19 @@ h2.page-title {
 
 body.modal-open {
   overflow: hidden;
+}
+
+html.modal-open,
+body.modal-open {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+body.modal-open {
+  position: fixed;
+  width: 100%;
+  left: 0;
+  right: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -133,6 +161,7 @@ body.modal-open {
   --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.15);
   --transition-speed: 0.3s;
+  --layout-content-max-width: 1200px;
 }
 
 html[data-theme="dark"] .dropdown-menu {
@@ -173,7 +202,7 @@ main {
 }
 
 .contenedor-principal {
-  max-width: 1200px;
+  max-width: var(--layout-content-max-width, 1200px);
   margin: 0 auto;
   padding: 20px;
 }
@@ -374,10 +403,14 @@ html[data-theme="dark"] header {
   align-items: center;
   justify-content: center;
   padding: 18px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .modal-ticket-navbar-content {
-  width: min(900px, 95vw);
+  width: 100%;
+  max-width: var(--layout-content-max-width, 1200px);
   max-height: 92vh;
   overflow: auto;
   padding: 24px;
@@ -553,8 +586,6 @@ html[data-theme="dark"] .modal-ticket-navbar-content {
 
 @media (max-width: 768px) {
   .modal-ticket-navbar-content {
-    width: 100%;
-    max-height: 95vh;
     padding: 18px 14px;
   }
 
@@ -620,12 +651,22 @@ html[data-theme="dark"] .modal-ticket-navbar-content {
   left: -300px;
   width: 280px;
   height: 100vh;
-  background-color: var(--primary-blue);
-  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 58, 112, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 24px rgba(0, 30, 60, 0.18);
   z-index: 2000;
-  overflow-y: auto;
+  overflow: hidden;
   transition: left 0.4s ease;
   padding-top: 20px;
+}
+
+html[data-theme="dark"] .mobile-sidebar {
+  background: rgba(5, 15, 30, 0.78);
+  border-right-color: rgba(255, 255, 255, 0.08);
 }
 
 .mobile-sidebar.open {
@@ -645,15 +686,16 @@ html[data-theme="dark"] .modal-ticket-navbar-content {
 .mobile-sidebar a {
   padding: 15px 20px;
   text-decoration: none;
-  font-size: 1rem;
-  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-light);
   display: block;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   transition: background 0.3s;
 }
 
 .mobile-sidebar a:hover {
-  background-color: rgba(255,255,255,0.1);
+  background-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Botón Tickets en Móvil */
@@ -671,8 +713,8 @@ html[data-theme="dark"] .modal-ticket-navbar-content {
 
 /* Desplegables Móvil */
 .mobile-sidebar .submenu-toggle {
-  background-color: rgba(255,255,255,0.05);
-  font-weight: bold;
+  background-color: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -685,15 +727,70 @@ html[data-theme="dark"] .modal-ticket-navbar-content {
 }
 
 .mobile-sidebar .sub-menu {
-  background-color: var(--dark-blue);
+  background: rgba(0, 30, 60, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: none;
+}
+html[data-theme="dark"] .mobile-sidebar .sub-menu {
+  background: rgba(0, 0, 0, 0.22);
 }
 .mobile-sidebar .sub-menu.open {
   display: block;
 }
 .mobile-sidebar .sub-menu a {
   padding-left: 40px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.mobile-sidebar__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.mobile-sidebar__footer {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin-top: auto;
+}
+
+.mobile-sidebar__profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  text-decoration: none;
   font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-light);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  transition: background 0.3s;
+}
+
+.mobile-sidebar__profile:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.mobile-sidebar__profile .nav-user-photo,
+.mobile-sidebar__profile .nav-user-avatar {
+  flex-shrink: 0;
+}
+
+.mobile-sidebar__logout {
+  display: block;
+  padding: 14px 20px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-light);
+  text-align: center;
+  transition: background 0.3s;
+}
+
+.mobile-sidebar__logout:hover {
+  background-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Overlay oscuro para móvil */
@@ -796,7 +893,7 @@ html[data-theme="dark"] footer {
 }
 
 /* MEDIA QUERIES */
-@media (max-width: 1100px) {
+@media (max-width: 1299px) {
   .main-nav { display: none; }
   .menu-toggle { display: block; }
   .header-inner { justify-content: space-between; }
@@ -1435,21 +1532,44 @@ color: #ccc; font-weight: bold; font-size: 1.2rem;
 }
 
 .modal-overlay {
-display: none;
-position: fixed;
-top: 0;
-left: 0;
-width: 100%;
-height: 100%;
-background: rgba(0, 0, 0, 0.6);
-z-index: 2000;
-align-items: center;
-justify-content: center;
-padding: 15px;
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+  padding: 15px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.modal-overlay > .modal-content,
+.modal-overlay > .modal-content2 {
+  box-sizing: border-box;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.modal-overlay > .modal-ticket-navbar-content {
+  box-sizing: border-box;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+/* Modales anchos: mismo ancho máximo que .contenedor-principal */
+.modal-content--layout,
+.modal-overlay.modal-crear-noticia > .modal-content,
+.modal-overlay.modal-editar-colaborador > .modal-content {
+  width: 100%;
+  max-width: var(--layout-content-max-width, 1200px);
 }
 
 .modal-content2 {
-  width: 90%;
+  width: 100%;
   max-width: 500px;
   background: var(--glass-bg-strong);
   backdrop-filter: blur(var(--glass-blur-strong));
@@ -1842,8 +1962,6 @@ border-color: #4f617f !important;
 .nav-user-menu.is-open .nav-user-dropdown { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; }
 .nav-user-dropdown a { display: block; padding: 10px 12px; border-radius: 8px; color: #003a70; text-decoration: none; font-weight: 700; font-size: 0.9rem; white-space: nowrap; }
 .nav-user-dropdown a:hover { background: #eef6ff; color: #0059b3; opacity: 1; }
-.nav-user-menu--mobile { padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-.nav-user-menu--mobile .nav-user-dropdown { left: 20px; right: auto; top: calc(100% - 6px); }
 .nav-social-icon { display: inline-flex; align-items: center; justify-content: center; }
 .salesforce-logo { width: 42px; height: auto; object-fit: contain; transform: translateY(1px); }
 .footer-home-col { align-items: center; justify-content: flex-start; }
@@ -1926,7 +2044,7 @@ body:not(.login-split-page) {
   padding: 0 12px;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1299px) {
   .header-inner {
     display: flex;
     justify-content: space-between;
@@ -1957,6 +2075,61 @@ body:not(.login-split-page) {
   .header-inner { gap: 10px; padding: 0 10px; }
   .logo-tw { height: 38px; }
   .btn-ticket-nav { padding: 7px 18px 7px 12px; font-size: 0.72rem; }
+}
+
+/* ── Modales a pantalla completa en móvil ── */
+@media (max-width: 768px) {
+  .modal-overlay,
+  .modal-imagen,
+  .foto-crop-overlay.is-open {
+    padding: 0 !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    overflow: hidden;
+  }
+
+  .foto-crop-overlay.is-open {
+    display: flex !important;
+    place-items: unset;
+    min-height: 100dvh;
+  }
+
+  .modal-overlay > .modal-content,
+  .modal-overlay > .modal-content2,
+  .modal-overlay > .modal-ticket-navbar-content,
+  .modal-imagen > .modal-imagen-contenido,
+  .foto-crop-overlay .foto-crop-modal {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 100dvh;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-overlay > .modal-content,
+  .modal-overlay > .modal-content2,
+  .modal-overlay > .modal-ticket-navbar-content,
+  .modal-imagen > .modal-imagen-contenido {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+
+  .modal-overlay.is-open > .modal-content,
+  .modal-overlay.is-open > .modal-content2,
+  .modal-overlay.is-open > .modal-ticket-navbar-content,
+  .modal-overlay.is-closing > .modal-content,
+  .modal-overlay.is-closing > .modal-content2,
+  .modal-overlay.is-closing > .modal-ticket-navbar-content,
+  .modal-imagen.is-open > .modal-imagen-contenido,
+  .modal-imagen.is-closing > .modal-imagen-contenido {
+    transform: none !important;
+    opacity: 1 !important;
+  }
 }
 
 /* ===== Fin CSS globalizado desde vistas EJS ===== */

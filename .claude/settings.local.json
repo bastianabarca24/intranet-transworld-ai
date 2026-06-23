@@ -3,7 +3,8 @@
     "allow": [
       "Bash(dir *)",
       "Skill(claude-api)",
-      "PowerShell(node -e \"console.log\\(require\\('@anthropic-ai/sdk/package.json'\\).version\\)\")"
+      "PowerShell(node -e \"console.log\\(require\\('@anthropic-ai/sdk/package.json'\\).version\\)\")",
+      "Bash(node *)"
     ]
   }
 }

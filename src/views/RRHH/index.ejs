@@ -1,55 +1,113 @@
 <style>
-  .rrhh-header {
-    color: #003a70;
-    margin-bottom: 5px;
-    font-weight: 800;
-    border-bottom: 2px solid #eef3f9;
-    padding-bottom: 10px;
+  .page-header-exec {
+    border-bottom: 2px solid #003a70;
+    padding-bottom: 12px;
+    margin-bottom: 25px;
   }
-  
-  .rrhh-subtitle {
-    color: #64748b;
-    margin-bottom: 15px;
-    font-size: 0.95rem;
+
+  .page-title-exec {
+    color: #003a70;
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .page-description-exec {
+    color: #4a5568;
+    font-size: 1.05rem;
+    margin-bottom: 30px;
   }
 
   .rrhh-section-title {
     color: #003a70;
     font-size: 1.15rem;
     font-weight: 700;
-    margin: 25px 0 15px 0;
-  }
-  
-  .rrhh-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
+    margin: 0 0 20px 0;
   }
 
-  .rrhh-card {
-    background: #003a70;
-    border: 1px solid #002a52;
+  .rrhh-section-title:not(:first-of-type) {
+    margin-top: 35px;
+  }
+
+  .grid-opciones-exec {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 25px;
+    margin-bottom: 10px;
+  }
+
+  .card-opcion-exec {
+    background: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border, #e2e8f0);
     border-radius: 12px;
-    padding: 25px;
+    padding: 30px 25px;
     text-decoration: none;
     display: flex;
-    flex-direction: column;
-    position: relative;
+    align-items: flex-start;
+    gap: 20px;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 6px rgba(0, 58, 112, 0.15);
+    box-shadow: var(--shadow-card, 0 2px 5px rgba(0, 0, 0, 0.02));
+    color: var(--color-text, #333333);
+    position: relative;
+  }
+
+  .card-opcion-exec:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.08);
+    border-color: var(--color-border-strong, #cbd5e0);
+    background: var(--color-surface-muted, #f8fafc);
+  }
+
+  .card-icon-wrapper {
+    background: #eef4ff;
+    color: #175cd3;
+    width: 55px;
+    height: 55px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    border: 1px solid #d1e0ff;
     overflow: hidden;
   }
-  
-  .rrhh-card:hover {
-    transform: translateY(-5px);
-    background: #004a8f;
-    box-shadow: 0 10px 20px rgba(0, 58, 112, 0.25);
+
+  .card-icon-wrapper img {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+  }
+
+  .card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-title {
+    color: var(--color-heading, #003a70);
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .card-desc {
+    color: var(--color-text-muted, #718096);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 0;
   }
 
   .link-type-badge {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    top: 14px;
+    right: 14px;
     font-size: 0.65rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -57,127 +115,97 @@
     border-radius: 4px;
     letter-spacing: 0.5px;
   }
-  
+
   .badge-interno {
-    background: rgba(255, 255, 255, 0.15);
-    color: #e2e8f0;
+    background: #eef4ff;
+    color: #175cd3;
+    border: 1px solid #d1e0ff;
   }
-  
+
   .badge-externo {
-    background: #82D200;
-    color: #003a70;
-  }
-
-  .rrhh-icon-container {
-    width: 55px;
-    height: 55px;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: white; 
-    border-radius: 8px;
-    padding: 5px;
-  }
-
-  .rrhh-icon-container.no-bg {
-    background: transparent !important;
-    padding: 0 !important;
-  }
-
-  .rrhh-icon-container img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-  }
-  
-  .rrhh-emoji {
-    font-size: 1.8rem;
-  }
-  
-  .rrhh-title {
-    color: #ffffff;
-    font-size: 1.15rem;
-    font-weight: 700;
-    margin-bottom: 6px;
-  }
-  
-  .rrhh-desc {
-    color: #cbd5e1; 
-    font-size: 0.85rem;
-    line-height: 1.4;
+    background: #ecfdf3;
+    color: #027a48;
+    border: 1px solid #abefc6;
   }
 
   .external-icon {
     font-size: 0.8rem;
-    margin-left: 5px;
+    margin-left: 3px;
   }
 </style>
 
-<h2 class="rrhh-header">Recursos Humanos</h2>
-<p class="rrhh-subtitle">Accede a las herramientas internas y portales externos de gestión.</p>
+<div class="contenedor">
+  <div class="page-header-exec">
+    <h2 class="page-title-exec">Recursos Humanos</h2>
+  </div>
 
-<h3 class="rrhh-section-title">Plataformas Internas</h3>
-<div class="rrhh-grid">
-  
-  <a href="/RRHH/organigrama" class="rrhh-card">
-    <span class="link-type-badge badge-interno">Interno</span>
-    <div class="rrhh-icon-container no-bg">
-      <span class="rrhh-emoji">🏢</span>
-    </div>
-    <div class="rrhh-text">
-      <span class="rrhh-title">Organigrama</span>
-      <span class="rrhh-desc">Estructura general y departamentos.</span>
-    </div>
-  </a>
+  <p class="page-description-exec">
+    Accede a las herramientas internas y portales externos de gestión.
+  </p>
 
-  <a href="/RRHH/personal" class="rrhh-card">
-    <span class="link-type-badge badge-interno">Interno</span>
-    <div class="rrhh-icon-container no-bg">
-      <span class="rrhh-emoji">👥</span>
-    </div>
-    <div class="rrhh-text">
-      <span class="rrhh-title">Personal</span>
-      <span class="rrhh-desc">Directorio de contacto de colaboradores.</span>
-    </div>
-  </a>
+  <h3 class="rrhh-section-title">Plataformas Internas</h3>
+  <div class="grid-opciones-exec">
+    <a href="/RRHH/organigrama" class="card-opcion-exec">
+      <span class="link-type-badge badge-interno">Interno</span>
+      <div class="card-icon-wrapper">🏢</div>
+      <div class="card-content">
+        <h3 class="card-title">Organigrama</h3>
+        <p class="card-desc">Estructura general y departamentos.</p>
+      </div>
+    </a>
 
-</div>
+    <a href="/RRHH/personal" class="card-opcion-exec">
+      <span class="link-type-badge badge-interno">Interno</span>
+      <div class="card-icon-wrapper">👥</div>
+      <div class="card-content">
+        <h3 class="card-title">Personal</h3>
+        <p class="card-desc">Directorio de contacto de colaboradores.</p>
+      </div>
+    </a>
 
-<h3 class="rrhh-section-title">Portales Externos</h3>
-<div class="rrhh-grid">
+    <a href="/RRHH/vacaciones" class="card-opcion-exec">
+      <span class="link-type-badge badge-interno">Interno</span>
+      <div class="card-icon-wrapper">🏖️</div>
+      <div class="card-content">
+        <h3 class="card-title">Vacaciones</h3>
+        <p class="card-desc">Solicita y gestiona vacaciones (Chile y Perú).</p>
+      </div>
+    </a>
+  </div>
 
-  <a href="https://transworld.rexmas.com/" target="_blank" class="rrhh-card">
-    <span class="link-type-badge badge-externo">Externo <span class="external-icon">↗</span></span>
-    <div class="rrhh-icon-container">
-      <img src="/img/logo_rex.png" alt="Rex+">
-    </div>
-    <div class="rrhh-text">
-      <span class="rrhh-title">Rex+</span>
-      <span class="rrhh-desc">Portal del colaborador y liquidaciones.</span>
-    </div>
-  </a>
+  <h3 class="rrhh-section-title">Portales Externos</h3>
+  <div class="grid-opciones-exec">
+    <a href="https://transworld.rexmas.com/" target="_blank" rel="noopener noreferrer" class="card-opcion-exec">
+      <span class="link-type-badge badge-externo">Externo <span class="external-icon">↗</span></span>
+      <div class="card-icon-wrapper">
+        <img src="/img/logo_rex.png" alt="Rex+">
+      </div>
+      <div class="card-content">
+        <h3 class="card-title">Rex+</h3>
+        <p class="card-desc">Portal del colaborador y liquidaciones.</p>
+      </div>
+    </a>
 
-  <a href="https://www.achs.cl/" target="_blank" class="rrhh-card">
-    <span class="link-type-badge badge-externo">Externo <span class="external-icon">↗</span></span>
-    <div class="rrhh-icon-container no-bg">
-      <img src="/img/achs.png" alt="ACHS">
-    </div>
-    <div class="rrhh-text">
-      <span class="rrhh-title">ACHS</span>
-      <span class="rrhh-desc">Seguridad y salud ocupacional.</span>
-    </div>
-  </a>
+    <a href="https://www.achs.cl/" target="_blank" rel="noopener noreferrer" class="card-opcion-exec">
+      <span class="link-type-badge badge-externo">Externo <span class="external-icon">↗</span></span>
+      <div class="card-icon-wrapper">
+        <img src="/img/achs.png" alt="ACHS">
+      </div>
+      <div class="card-content">
+        <h3 class="card-title">ACHS</h3>
+        <p class="card-desc">Seguridad y salud ocupacional.</p>
+      </div>
+    </a>
 
-  <a href="https://www.cajalosandes.cl/" target="_blank" class="rrhh-card">
-    <span class="link-type-badge badge-externo">Externo <span class="external-icon">↗</span></span>
-    <div class="rrhh-icon-container no-bg">
-      <img src="/img/cajalosandes.png" alt="Caja Los Andes">
-    </div>
-    <div class="rrhh-text">
-      <span class="rrhh-title">Caja Los Andes</span>
-      <span class="rrhh-desc">Beneficios, convenios y ahorros.</span>
-    </div>
-  </a>
-
+    <a href="https://www.cajalosandes.cl/" target="_blank" rel="noopener noreferrer" class="card-opcion-exec">
+      <span class="link-type-badge badge-externo">Externo <span class="external-icon">↗</span></span>
+      <div class="card-icon-wrapper">
+        <img src="/img/cajalosandes.png" alt="Caja Los Andes">
+      </div>
+      <div class="card-content">
+        <h3 class="card-title">Caja Los Andes</h3>
+        <p class="card-desc">Beneficios, convenios y ahorros.</p>
+      </div>
+    </a>
+  </div>
 </div>

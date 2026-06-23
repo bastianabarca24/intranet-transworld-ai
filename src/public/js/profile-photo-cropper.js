@@ -16,6 +16,11 @@
 
     const maxSizeMb = config.maxSizeMb || 8;
     const outputSize = config.outputSize || 300;
+    const outputWidth = config.outputWidth || outputSize;
+    const outputHeight = config.outputHeight || outputSize;
+    const aspectRatio = config.aspectRatio || 1;
+    const selectLabel = config.selectLabel || "Seleccionar foto";
+    const changeLabel = config.changeLabel || "Cambiar foto";
     const outputFilename = config.outputFilename || "foto-perfil.jpg";
 
     let cropper = null;
@@ -48,7 +53,11 @@
     function closeModal(resetInput) {
       overlay.classList.remove("is-open");
       overlay.setAttribute("hidden", "");
-      document.body.style.overflow = "";
+      if (global.IntranetModal?.unlockScroll) {
+        global.IntranetModal.unlockScroll();
+      } else {
+        document.body.style.overflow = "";
+      }
       destroyCropper();
       if (resetInput) fileInput.value = "";
       btnSave.disabled = false;
@@ -65,7 +74,7 @@
       }
       if (previewPlaceholder) previewPlaceholder.hidden = true;
       if (changeBtn) changeBtn.hidden = false;
-      if (selectBtn) selectBtn.textContent = "Cambiar foto";
+      if (selectBtn) selectBtn.textContent = changeLabel;
     }
 
     function syncFileInputFromBlob(blob) {
@@ -85,7 +94,7 @@
       }
       if (previewPlaceholder) previewPlaceholder.hidden = false;
       if (changeBtn) changeBtn.hidden = true;
-      if (selectBtn) selectBtn.textContent = "Seleccionar foto";
+      if (selectBtn) selectBtn.textContent = selectLabel;
       if (previewObjectUrl) {
         URL.revokeObjectURL(previewObjectUrl);
         previewObjectUrl = null;
@@ -108,7 +117,11 @@
       cropImg.src = objectUrl;
       overlay.classList.add("is-open");
       overlay.removeAttribute("hidden");
-      document.body.style.overflow = "hidden";
+      if (global.IntranetModal?.lockScroll) {
+        global.IntranetModal.lockScroll();
+      } else {
+        document.body.style.overflow = "hidden";
+      }
 
       function initCropperInstance() {
         if (typeof global.Cropper === "undefined") {
@@ -118,7 +131,7 @@
           return;
         }
         cropper = new global.Cropper(cropImg, {
-          aspectRatio: 1,
+          aspectRatio: aspectRatio,
           viewMode: 1,
           dragMode: "move",
           autoCropArea: 0.85,
@@ -189,8 +202,8 @@
       btnSave.textContent = "Procesando…";
 
       const canvas = cropper.getCroppedCanvas({
-        width: outputSize,
-        height: outputSize,
+        width: outputWidth,
+        height: outputHeight,
         imageSmoothingEnabled: true,
         imageSmoothingQuality: "high",
       });

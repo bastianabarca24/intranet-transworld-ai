@@ -58,6 +58,7 @@
 
     const localInput = root.querySelector(".phone-field__local");
     const hiddenInput =
+      root.querySelector('input[type="hidden"][name="phone"]') ||
       root.querySelector('input[type="hidden"][name="telefono"]') ||
       root.querySelector(".phone-field__full");
 
@@ -103,7 +104,9 @@
 
   function isFieldValid(root) {
     if (!root) return false;
-    const hiddenInput = root.querySelector('input[type="hidden"][name="telefono"]');
+    const hiddenInput =
+      root.querySelector('input[type="hidden"][name="phone"]') ||
+      root.querySelector('input[type="hidden"][name="telefono"]');
     return hiddenInput
       ? isValidChileMobilePhone(hiddenInput.value)
       : false;
