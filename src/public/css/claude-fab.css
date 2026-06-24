@@ -1,8 +1,7 @@
-/* Logo IA compartido (mismo símbolo que .welcome-logo en Claude) */
+/* Logo Claude compartido (FAB, modal, avatares, navbar) */
 .claude-ai-logo {
-  font-weight: 700;
-  line-height: 1;
-  font-family: inherit;
+  display: block;
+  flex-shrink: 0;
 }
 
 /* ---- Navbar (escritorio) ---- */
@@ -13,8 +12,9 @@
 }
 
 .nav-claude-link .claude-ai-logo {
-  font-size: 1.05rem;
-  color: #9fd4ff;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: #e8a88f;
   transition: transform 0.2s ease, color 0.2s ease;
 }
 
@@ -31,8 +31,9 @@
 }
 
 .mobile-claude-link .claude-ai-logo {
-  font-size: 1.1rem;
-  color: #003a70;
+  width: 1.1rem;
+  height: 1.1rem;
+  color: #d97757;
 }
 
 /* ---- Botón flotante ---- */
@@ -44,20 +45,21 @@
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #003a70 0%, #0055a5 100%);
+  background: linear-gradient(145deg, #d97757 0%, #c4684a 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  box-shadow: 0 6px 24px rgba(0, 58, 112, 0.38);
-  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease;
+  box-shadow: 0 6px 24px rgba(217, 119, 87, 0.38);
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.28s ease, background 0.2s ease;
 }
 
 .claude-fab:hover,
 .claude-fab:focus-visible {
   transform: scale(1.14);
-  box-shadow: 0 10px 32px rgba(0, 58, 112, 0.48);
+  background: linear-gradient(145deg, #e08566 0%, #d97757 100%);
+  box-shadow: 0 10px 32px rgba(217, 119, 87, 0.48);
   outline: none;
 }
 
@@ -66,9 +68,9 @@
 }
 
 .claude-fab-logo {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
   pointer-events: none;
 }
 
@@ -93,7 +95,8 @@
   transform: scale(1);
 }
 
-.claude-fab.is-loading .claude-fab-logo {
+.claude-fab.is-loading .claude-fab-logo,
+.claude-fab.is-loading .claude-ai-logo {
   display: none;
 }
 
@@ -153,7 +156,8 @@
   }
 
   .claude-fab-logo {
-    font-size: 24px;
+    width: 24px;
+    height: 24px;
   }
 
   .claude-fab-tooltip {
@@ -224,7 +228,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #003a70;
+  color: #d97757;
   display: flex;
   align-items: center;
   gap: 8px;

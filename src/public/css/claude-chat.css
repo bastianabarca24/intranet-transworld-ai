@@ -5,8 +5,8 @@
   --cl-border: #e3e1da;
   --cl-text: #1f1e1c;
   --cl-muted: #76746e;
-  --cl-accent: #003a70;     /* terracota Claude */
-  --cl-accent-hover: #0055a5;
+  --cl-accent: #d97757;
+  --cl-accent-hover: #c4684a;
   --cl-user-bubble: #f0eee6;
   --cl-card: #ffffff;
   --cl-radius: 14px;
@@ -79,7 +79,7 @@
   transition: background .12s;
 }
 .conversation-item:hover { background: rgba(0, 0, 0, .06); }
-.conversation-item.active { background: rgba(201, 100, 66, .14); }
+.conversation-item.active { background: rgba(217, 119, 87, .14); }
 .conv-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .conv-actions {
   display: flex; align-items: center; gap: 2px; flex-shrink: 0;
@@ -118,8 +118,14 @@
 
 /* ---- Welcome ---- */
 .welcome-section { text-align: center; margin: auto; padding-top: 6vh; }
-.welcome-logo { font-size: 38px; color: var(--cl-accent); margin-bottom: 6px; }
-.welcome-logo.claude-ai-logo { font-weight: 700; }
+.welcome-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+  color: var(--cl-accent);
+}
+.welcome-logo .claude-ai-logo { width: 38px; height: 38px; }
 .welcome-section h2 { font-size: 28px; margin: 0 0 8px; font-weight: 600; }
 .welcome-section p { color: var(--cl-muted); margin: 0 0 26px; }
 .quick-actions {
@@ -143,7 +149,8 @@
 }
 .msg.user { justify-content: flex-end; }
 .msg.user .msg-avatar { display: none; }
-.msg.assistant .msg-avatar { background: var(--cl-accent); }
+.msg.assistant .msg-avatar { background: var(--cl-accent); color: #fff; }
+.msg.assistant .msg-avatar .claude-ai-logo { width: 14px; height: 14px; }
 
 .msg-body { min-width: 0; max-width: 100%; }
 .msg.user .msg-body {
