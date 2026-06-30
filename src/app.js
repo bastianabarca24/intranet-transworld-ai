@@ -329,15 +329,16 @@ async function asegurarSchemaVacaciones() {
   }
 }
 
+app.listen(PORT, () => {
+  console.log(`Servidor de Intranet corriendo en puerto ${PORT}`);
+});
+
+// Migraciones y sincronización en background (no bloquean el arranque del servidor).
 Promise.allSettled([
   asegurarCorreoUnico(),
   asegurarColumnaNoticiasDestacada(),
   sincronizarUsuariosDeshabilitados(),
   asegurarSchemaVacaciones(),
 ]).finally(() => {
-  // El cron de vacaciones se inicia tras asegurar el schema.
   iniciarTransicionesVacaciones();
-  app.listen(PORT, () => {
-    console.log(`Servidor de Intranet corriendo en puerto ${PORT}`);
-  });
 });

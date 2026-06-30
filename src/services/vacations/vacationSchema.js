@@ -163,15 +163,20 @@ async function ensureVacationSchema() {
 }
 
 async function seedHolidays() {
-  // Inserta feriados base sin duplicar (UNIQUE country_code, holiday_date).
-  for (const [country, date, name] of SEED_HOLIDAYS) {
-    await db.query(
-      `INSERT INTO public_holidays (country_code, holiday_date, name)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (country_code, holiday_date) DO NOTHING`,
-      [country, date, name],
-    );
-  }
+  if (!SEED_HOLIDAYS.length) return;
+
+  const countries = SEED_HOLIDAYS.map(([country]) => country);
+  const dates = SEED_HOLIDAYS.map(([, date]) => date);
+  const names = SEED_HOLIDAYS.map(([, , name]) => name);
+
+  await db.query(
+    `INSERT INTO public_holidays (country_code, holiday_date, name)
+     SELECT country_code, holiday_date, name
+     FROM UNNEST($1::varchar[], $2::date[], $3::varchar[])
+       AS t(country_code, holiday_date, name)
+     ON CONFLICT (country_code, holiday_date) DO NOTHING`,
+    [countries, dates, names],
+  );
 }
 
 module.exports = { ensureVacationSchema };

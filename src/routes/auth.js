@@ -15,7 +15,7 @@ const {
   canLogin,
 } = require("../constants/roles");
 const linkedinService = require("../services/linkedinService");
-const { courseStatusFromDb } = require("../utils/schemaMappers");
+const { mapCompletedCourseForView } = require("../utils/schemaMappers");
 const { generateUniqueUsuarioId } = require("../utils/userId");
 
 function getBaseUrl(req) {
@@ -916,28 +916,47 @@ router.post("/reset-password", async (req, res) => {
 // ==========================================
 // CAMBIAR CONTRASEÑA
 // ==========================================
+function wantsJsonResponse(req) {
+  return (
+    req.get("Accept")?.includes("application/json") ||
+    req.get("X-Requested-With") === "fetch"
+  );
+}
+
+function redirectPasswordError(res, error) {
+  return res.redirect(
+    `/perfil?openPasswordModal=1&password_error=${encodeURIComponent(error)}`,
+  );
+}
+
 router.get("/change-password", (req, res) => {
   if (!req.session || !req.session.user) return res.redirect("/login");
-  res.render("change_password", { titulo: "Cambiar contraseña", error: null });
+  res.redirect("/perfil?openPasswordModal=1");
 });
 
 router.post("/change-password", async (req, res) => {
-  if (!req.session || !req.session.user) return res.redirect("/login");
+  if (!req.session || !req.session.user) {
+    if (wantsJsonResponse(req)) {
+      return res.status(401).json({ ok: false, error: "Sesión expirada." });
+    }
+    return res.redirect("/login");
+  }
 
+  const json = wantsJsonResponse(req);
   const { old_password, new_password, confirm_password } = req.body;
   const userId = req.session.user.id;
 
   try {
-    if (new_password !== confirm_password)
-      return res.render("change_password", {
-        titulo: "Cambiar contraseña",
-        error: "Las nuevas contraseñas no coinciden.",
-      });
-    if (new_password.length < 6)
-      return res.render("change_password", {
-        titulo: "Cambiar contraseña",
-        error: "Mínimo 6 caracteres.",
-      });
+    if (new_password !== confirm_password) {
+      const error = "Las nuevas contraseñas no coinciden.";
+      if (json) return res.status(400).json({ ok: false, error });
+      return redirectPasswordError(res, error);
+    }
+    if (new_password.length < 6) {
+      const error = "Mínimo 6 caracteres.";
+      if (json) return res.status(400).json({ ok: false, error });
+      return redirectPasswordError(res, error);
+    }
 
     const { rows } = await pool.query(
       "SELECT password_hash, password_salt FROM users WHERE id = $1",
@@ -948,10 +967,9 @@ router.post("/change-password", async (req, res) => {
     const u = rows[0];
     const computed = pbkdf2Hash(old_password, u.password_salt);
     if (!safeEqualHex(computed, u.password_hash)) {
-      return res.render("change_password", {
-        titulo: "Cambiar contraseña",
-        error: "La contraseña actual es incorrecta.",
-      });
+      const error = "La contraseña actual es incorrecta.";
+      if (json) return res.status(400).json({ ok: false, error });
+      return redirectPasswordError(res, error);
     }
 
     const newSalt = crypto.randomBytes(16).toString("hex");
@@ -962,13 +980,15 @@ router.post("/change-password", async (req, res) => {
       [newHash, newSalt, userId],
     );
 
-    res.redirect("/login?changed=1");
+    if (json) {
+      return res.json({ ok: true, redirect: "/login?changed=1" });
+    }
+    return res.redirect("/login?changed=1");
   } catch (err) {
     console.error("Change password error:", err);
-    res.status(500).render("change_password", {
-      titulo: "Cambiar contraseña",
-      error: "Error interno.",
-    });
+    const error = "Error interno.";
+    if (json) return res.status(500).json({ ok: false, error });
+    return redirectPasswordError(res, error);
   }
 });
 
@@ -1013,7 +1033,7 @@ router.get("/perfil/cursos", async (req, res) => {
 
   try {
     const sqlCursos = `
-      SELECT cu.course_id AS curso_id, c.title AS titulo, cu.score AS nota, cu.attempts AS intentos, cu.completed_at AS fecha_completado, cu.status AS estado_db
+      SELECT cu.course_id, c.title, cu.score, cu.attempts, cu.completed_at, cu.status
       FROM user_course_progress cu
       JOIN courses c ON cu.course_id = c.id
       WHERE cu.user_id = $1 AND cu.status = 'evaluated'
@@ -1034,10 +1054,7 @@ router.get("/perfil/cursos", async (req, res) => {
       pool.query(sqlTotalCursos),
     ]);
 
-    const cursosRealizados = resultCursos.rows.map((row) => ({
-      ...row,
-      estado: courseStatusFromDb(row.estado_db),
-    }));
+    const cursosRealizados = resultCursos.rows.map(mapCompletedCourseForView);
     const puntajeTotal = resultPuntaje.rows[0].puntaje_total;
     const totalCursosActivos = parseInt(resultTotal.rows[0].total) || 0;
 

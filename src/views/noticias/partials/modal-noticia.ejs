@@ -344,7 +344,7 @@
     <button type="button" class="modal-close" onclick="cerrarModalNoticia()" aria-label="Cerrar">&times;</button>
     <div class="modal-crear-scroll">
       <h2 id="modalNoticiaTitulo">Publicar Nueva Noticia</h2>
-      <p class="modal-crear-desc" id="modalNoticiaDesc">Comparte un comunicado con el equipo. La portada se recorta en formato 16:9.</p>
+      <p class="modal-crear-desc" id="modalNoticiaDesc">Comparte un comunicado con el equipo de Transworld.</p>
 
       <form id="formNoticia" action="/noticias/crear" method="POST" class="noticia-form">
         <div class="noticia-form-layout">
@@ -363,7 +363,7 @@
               <label>Imagen de Portada (opcional)</label>
               <div class="noticia-cover-actions">
                 <button type="button" class="btn-modal-secundario" id="btn-select-cover">Seleccionar Portada</button>
-                <span class="hint-modal" id="hintPortada">JPG, PNG o WebP · Se recorta a 16:9 · Máx. 8 MB</span>
+                <span class="hint-modal" id="hintPortada">JPG, PNG o WebP · Máx. 8 MB</span>
               </div>
               <input type="file" id="filePortada" accept="image/*" hidden>
               <input type="hidden" name="imagen_portada" id="url_portada">

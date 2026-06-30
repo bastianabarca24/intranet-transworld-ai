@@ -7,16 +7,6 @@
     box-sizing: border-box;
   }
 
-  /* --- CONTENEDOR SUPERIOR --- */
-  .cabecera-tickets {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-      gap: 15px;
-  }
-
   /* --- CONTENEDOR SCROLL DE LA TABLA --- */
   .tabla-tickets-scroll {
     width: 100%;
@@ -220,13 +210,13 @@
 </style>
 
 <div class="tickets-contenedor">
-<div class="cabecera-tickets">
-  <div>
-    <h2 style="color: #003a70; margin: 0; font-size: 2rem;"><%= titulo || 'Soporte de TI' %></h2>
-    <p style="color: #666; margin: 5px 0 0 0;">Listado de tickets recibidos por soporte.</p>
+<div class="page-header page-header--toolbar">
+  <div class="page-header__text">
+    <h2 class="page-title"><%= titulo || 'Soporte de TI' %></h2>
+    <p class="page-description">Listado de tickets recibidos por soporte.</p>
   </div>
-  
-  <div style="display: flex; gap: 15px; align-items: center;">
+
+  <div class="page-header-actions">
     <% if (typeof isAdministrador !== 'undefined' && isAdministrador) { %>
     <button id="btnToggleCerrados" type="button" class="btn-toggle-cerrados" onclick="toggleCerrados()">
       <span id="eyeIcon" style="display: flex; align-items: center;">
@@ -240,7 +230,7 @@
       <span style="font-size: 1.2rem; line-height: 1;">+</span> Abrir Nuevo Ticket
     </a>
   </div>
-</div>
+</div><!-- /.page-header -->
 
 <div class="tabla-tickets-scroll">
 <table class="tabla-tickets" id="ticketsTable">
@@ -290,14 +280,7 @@
          const strCreado = t.created_at ? new Date(t.created_at).toLocaleDateString('es-CL', options) : '-';
          const strUltima = t.fecha_ultima_respuesta ? new Date(t.fecha_ultima_respuesta).toLocaleDateString('es-CL', options) : '-';
          
-         let tRespuesta = '-';
-         if (t.fecha_ultima_respuesta && t.created_at) {
-            const diffMs = new Date(t.fecha_ultima_respuesta) - new Date(t.created_at);
-            const diffMins = Math.floor(diffMs / 60000);
-            if (diffMins < 60) tRespuesta = `${diffMins}m`;
-            else if (diffMins < 1440) tRespuesta = `${Math.floor(diffMins/60)}h ${diffMins%60}m`;
-            else tRespuesta = `${Math.floor(diffMins/1440)}d ${Math.floor((diffMins%1440)/60)}h`;
-         }
+         const tRespuesta = t.tiempo_respuesta || '-';
       %>
         <tr class="clickable-row <%= esNoLeido ? 'fila-no-leida' : '' %>" data-href="/sistemas/tickets/<%= t.id %>" data-estado="<%= t.status %>">
           
@@ -322,7 +305,7 @@
           <td class="col-correo col-ocultar-mobile" style="color: #555; font-size: 0.9em;"><%= t.requester_email %></td>
           <td class="col-creado col-ocultar-mobile" data-sort="<%= t.created_at ? new Date(t.created_at).getTime() : 0 %>" style="color: #555; font-size: 0.85em;"><%= strCreado %></td>
           <td class="col-ult-respuesta col-ocultar-mobile" data-sort="<%= t.fecha_ultima_respuesta ? new Date(t.fecha_ultima_respuesta).getTime() : 0 %>" style="color: #555; font-size: 0.85em;"><%= strUltima %></td>
-          <td class="col-t-respuesta col-ocultar-mobile" style="color: #003a70; font-weight: 600; font-size: 0.9em;"><%= tRespuesta %></td>
+          <td class="col-t-respuesta col-ocultar-mobile" data-sort="<%= t.tiempo_respuesta_minutos != null ? t.tiempo_respuesta_minutos : -1 %>" style="color: #003a70; font-weight: 600; font-size: 0.9em;"><%= tRespuesta %></td>
           
         </tr>
       <% }) %>

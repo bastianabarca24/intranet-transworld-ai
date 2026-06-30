@@ -371,7 +371,7 @@
                       <p class="home-comms__cta">Haga click para ver más...</p>
                     </div>
                   <% } else { %>
-                    <img src="<%= post.image_url %>" alt="Publicación LinkedIn" class="home-comms__img" onerror="this.src='/img/fondo-home.png'">
+                    <img src="<%= post.image_url %>" alt="Publicación LinkedIn" class="home-comms__img<%= post.image_url === '/img/linkedin_off.jpg' ? ' home-comms__img--cover' : '' %>" onerror="this.src='/img/fondo-home.png'">
                   <% } %>
                 </a>
               </div>
@@ -432,7 +432,7 @@
       <li class="home-tutorial__step">
         <span class="home-tutorial__icon" aria-hidden="true">✨</span>
         <div>
-          <strong>Asistente IA</strong>
+          <strong>Asistente IA de Transworld</strong>
           <p>El botón flotante en la esquina inferior te ayuda con consultas sobre la intranet.</p>
         </div>
       </li>

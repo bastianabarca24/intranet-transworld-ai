@@ -1,9 +1,4 @@
 <style>
-  /* --- ESTILOS BASE EJECUTIVOS PARA TABLAS Y LISTADOS --- */
-  .contenedor { max-width: 1100px; margin: 0 auto; padding: 20px; font-family: system-ui, -apple-system, sans-serif; }
-  .page-title, h2 { color: #003a70; font-size: 1.8rem; font-weight: 800; margin: 0 0 10px 0; border-bottom: 2px solid #003a70; padding-bottom: 10px; }
-  .page-description, p { color: #4a5568; font-size: 1rem; margin-bottom: 25px; }
-
   .link-volver { display: inline-flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #cbd5e0; color: #4a5568; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; margin-bottom: 20px;}
   .link-volver:hover { background: #edf2f7; color: #1a202c; }
 
@@ -23,8 +18,10 @@
     <a href="/RRHH/personal" class="link-volver" style="text-decoration: none; color: #555;">← Volver a Gestión de Usuarios</a>
   </div>
 
-  <h2 class="page-title">Historial de Cambios</h2>
-  <p class="page-description">Últimos 100 movimientos registrados en la plataforma.</p>
+  <div class="page-header">
+    <h2 class="page-title">Historial de Cambios</h2>
+    <p class="page-description">Últimos 100 movimientos registrados en la plataforma.</p>
+  </div>
 
   <div class="panel">
     <table class="tabla" style="width: 100%; border-collapse: collapse;">

@@ -199,6 +199,175 @@ function mapVacationPeriodForView(row) {
   };
 }
 
+function normalizeCourseStatus(status) {
+  if (!status) return "in_progress";
+  if (status === "Evaluado" || status === "evaluated") return "evaluated";
+  if (status === "En curso" || status === "in_progress") return "in_progress";
+  return status;
+}
+
+function courseStatusLabel(status) {
+  const normalized = normalizeCourseStatus(status);
+  if (normalized === "evaluated") return "Completado";
+  if (normalized === "in_progress") return "En curso";
+  return "Sin iniciar";
+}
+
+function mapCourseCatalogRow(row) {
+  if (!row) return row;
+  return {
+    id: row.id,
+    title: row.title ?? row.titulo,
+    section: row.section ?? row.seccion ?? null,
+    subsection: row.subsection ?? row.subseccion ?? null,
+  };
+}
+
+function mapIntegranteCourseProgress(row) {
+  if (!row) return row;
+  const status = row.status
+    ? normalizeCourseStatus(row.status)
+    : row.progress_id
+      ? "in_progress"
+      : null;
+  return {
+    course_id: row.course_id,
+    title: row.title,
+    section: row.section ?? null,
+    subsection: row.subsection ?? null,
+    required_watch_seconds: Number(row.required_watch_seconds ?? 0),
+    status,
+    status_label: status ? courseStatusLabel(status) : "Sin iniciar",
+    score: row.score != null ? Number(row.score) : null,
+    attempts: row.attempts != null ? Number(row.attempts) : null,
+    seconds_watched: Number(row.seconds_watched ?? 0),
+    started_at: row.started_at ?? null,
+    completed_at: row.completed_at ?? null,
+  };
+}
+
+function mapCourseListRow(row) {
+  if (!row) return row;
+  return {
+    id: row.id,
+    title: row.title ?? row.titulo,
+    subsection: row.subsection ?? row.subseccion,
+    image_url: row.image_url ?? row.imagen_url ?? null,
+  };
+}
+
+function mapCourseProgressForView(row) {
+  if (!row) return row;
+  return {
+    course_id: row.course_id ?? row.curso_id,
+    seconds_watched: Number(row.seconds_watched ?? row.segundos_vistos ?? 0),
+    status: normalizeCourseStatus(row.status ?? row.estado_db ?? row.estado),
+    score: row.score ?? row.nota ?? null,
+    attempts: row.attempts ?? row.intentos ?? null,
+    completed_at: row.completed_at ?? row.fecha_completado ?? null,
+  };
+}
+
+function mapCourseForView(row) {
+  if (!row) return row;
+  const title = row.title ?? row.titulo;
+  const description = row.description ?? row.descripcion;
+  return {
+    ...row,
+    id: row.id,
+    title,
+    description,
+    subsection: row.subsection ?? row.subseccion,
+    section: row.section ?? row.seccion,
+    commercial_tips: row.commercial_tips ?? row.consejos_comerciales,
+    required_watch_seconds:
+      row.required_watch_seconds ?? row.tiempo_requerido_segundos,
+    video_url: row.video_url,
+    is_active: row.is_active ?? row.activo,
+    titulo: title,
+    descripcion: description,
+    subseccion: row.subsection ?? row.subseccion,
+    seccion: row.section ?? row.seccion,
+    consejos_comerciales: row.commercial_tips ?? row.consejos_comerciales,
+    tiempo_requerido_segundos:
+      row.required_watch_seconds ?? row.tiempo_requerido_segundos,
+  };
+}
+
+function mapStudyMaterialForView(row) {
+  if (!row) return row;
+  const name = row.name ?? row.nombre;
+  const fileUrl = row.file_url ?? row.archivo_url;
+  return {
+    ...row,
+    id: row.id,
+    name,
+    file_url: fileUrl,
+    section: row.section ?? row.seccion,
+    created_at: row.created_at ?? row.fecha_creacion,
+    nombre: name,
+    archivo_url: fileUrl,
+    seccion: row.section ?? row.seccion,
+    fecha_creacion: row.created_at ?? row.fecha_creacion,
+  };
+}
+
+function mapQuestionOptionForView(row) {
+  if (!row) return row;
+  const text = row.text ?? row.texto;
+  return {
+    id: row.id,
+    text,
+    texto: text,
+  };
+}
+
+function mapQuestionForView(row) {
+  if (!row) return row;
+  const questionText = row.question_text ?? row.enunciado;
+  return {
+    id: row.id,
+    question_text: questionText,
+    sort_order: row.sort_order ?? row.orden,
+    enunciado: questionText,
+    orden: row.sort_order ?? row.orden,
+    alternativas: (row.alternativas || []).map(mapQuestionOptionForView),
+  };
+}
+
+function mapCompletedCourseForView(row) {
+  if (!row) return row;
+  const courseId = row.course_id ?? row.curso_id ?? row.id;
+  return {
+    course_id: courseId,
+    id: courseId,
+    title: row.title ?? row.titulo,
+    score: row.score ?? row.nota,
+    attempts: row.attempts ?? row.intentos,
+    completed_at: row.completed_at ?? row.fecha_completado,
+    status: "evaluated",
+  };
+}
+
+function buildCourseProgressMap(rows) {
+  const progresoMap = {};
+  rows.forEach((row) => {
+    const mapped = mapCourseProgressForView(row);
+    progresoMap[mapped.course_id] = mapped;
+  });
+  return progresoMap;
+}
+
+function groupCoursesBySubsection(rows) {
+  const grouped = {};
+  rows.map(mapCourseListRow).forEach((curso) => {
+    const sub = curso.subsection || "Otros";
+    if (!grouped[sub]) grouped[sub] = [];
+    grouped[sub].push(curso);
+  });
+  return grouped;
+}
+
 module.exports = {
   ticketStatusToDb,
   ticketStatusFromDb,
@@ -215,4 +384,16 @@ module.exports = {
   mapPersonaForView,
   mapVacationRequestForView,
   mapVacationPeriodForView,
+  mapCourseListRow,
+  mapCourseProgressForView,
+  mapCourseForView,
+  mapStudyMaterialForView,
+  mapQuestionForView,
+  mapQuestionOptionForView,
+  mapCompletedCourseForView,
+  buildCourseProgressMap,
+  groupCoursesBySubsection,
+  courseStatusLabel,
+  mapCourseCatalogRow,
+  mapIntegranteCourseProgress,
 };

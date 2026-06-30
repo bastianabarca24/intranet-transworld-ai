@@ -255,15 +255,19 @@ async function deleteFile(relativePathOrUrl) {
   }
 }
 
-async function listChildren(folderRelative) {
+async function listChildren(folderRelative, { limit } = {}) {
   const folderPath = normalizeRelativePath(folderRelative);
   const client = await getGraphClient();
-  const suffix = folderPath ? ":/children" : "";
   const apiPath = folderPath
     ? buildDriveItemPath(folderPath, ":/children")
     : `/sites/${getSiteId()}/drive/root:/${CONTENT_ROOT}:/children`;
 
-  const response = await client.api(apiPath).get();
+  let request = client.api(apiPath);
+  if (limit) {
+    request = request.top(limit);
+  }
+
+  const response = await request.get();
   return response.value || [];
 }
 
@@ -308,12 +312,12 @@ async function listFilesRecursive(folderRelative) {
 /**
  * Lista solo archivos directos de una carpeta (sin subcarpetas anidadas).
  */
-async function listFilesInFolder(folderRelative) {
+async function listFilesInFolder(folderRelative, { limit } = {}) {
   const base = normalizeRelativePath(folderRelative);
   let children;
 
   try {
-    children = await listChildren(base);
+    children = await listChildren(base, { limit });
   } catch (err) {
     if (err.statusCode === 404) return [];
     throw err;
@@ -331,7 +335,9 @@ async function listFilesInFolder(folderRelative) {
         sharepointId: item.id,
         webUrl: item.webUrl,
       };
-    });
+    })
+    .sort((a, b) => b.created_at - a.created_at)
+    .slice(0, limit || undefined);
 }
 
 /**

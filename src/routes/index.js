@@ -7,8 +7,8 @@ const userPhotoStorage = require("../services/userPhotoStorage");
 const { getIndicadores } = require("../services/usdService");
 const { getWeather } = require("../services/weatherService");
 const linkedinService = require("../services/linkedinService");
+const { ROLES, isAdministrador, normalizeRole } = require("../constants/roles");
 const requireRole = require("../middlewares/requireRole");
-const { isAdministrador, ROLES, normalizeRole } = require("../constants/roles");
 const { toTitleCase } = require("../utils/formatName");
 const {
   toTelHref,
@@ -20,8 +20,14 @@ const {
   NOTICIA_VIEW_COLUMNS,
   APPLICATION_VIEW_COLUMNS,
   MATERIAL_VIEW_COLUMNS,
-  courseStatusToDb,
-  courseStatusFromDb,
+  mapCourseForView,
+  mapStudyMaterialForView,
+  mapQuestionForView,
+  mapCompletedCourseForView,
+  buildCourseProgressMap,
+  groupCoursesBySubsection,
+  mapCourseCatalogRow,
+  mapIntegranteCourseProgress,
 } = require("../utils/schemaMappers");
 
 const storage = multer.memoryStorage();
@@ -31,54 +37,27 @@ const upload = multer({ storage });
 // SISTEMA DE CACHÉ
 // ==========================================
 const COURSE_LIST_BASE = `
-  SELECT c.id, c.title AS titulo, c.subsection AS subseccion, sd.image_url AS imagen_url
+  SELECT c.id, c.title, c.subsection, sd.image_url
   FROM courses c
   LEFT JOIN subsection_details sd ON c.subsection = sd.name
 `;
 
-function buildProgresoMap(rows) {
-  const progresoMap = {};
-  rows.forEach((p) => {
-    progresoMap[p.curso_id] = {
-      curso_id: p.curso_id,
-      segundos_vistos: p.segundos_vistos,
-      estado: courseStatusFromDb(p.estado_db ?? p.estado),
-    };
-  });
-  return progresoMap;
-}
-
-function mapCursoRow(curso) {
-  return {
-    ...curso,
-    titulo: curso.title ?? curso.titulo,
-    descripcion: curso.description ?? curso.descripcion,
-    subseccion: curso.subsection ?? curso.subseccion,
-    tiempo_requerido_segundos:
-      curso.required_watch_seconds ?? curso.tiempo_requerido_segundos,
-  };
-}
-
-function mapPreguntaRow(pregunta) {
-  return {
-    ...pregunta,
-    enunciado: pregunta.question_text ?? pregunta.enunciado,
-    orden: pregunta.sort_order ?? pregunta.orden,
-    alternativas: (pregunta.alternativas || []).map((alt) => ({
-      id: alt.id,
-      texto: alt.text ?? alt.texto,
-    })),
-  };
-}
+const COURSE_PROGRESS_COLUMNS = `
+  course_id, status, seconds_watched
+`;
 let cachedIndicadores = {
   dolar: { valor: null, tendencia: "igual" },
   euro: { valor: null, tendencia: "igual" },
   uf: { valor: null, tendencia: "igual" },
 };
 let cachedClima = { temp: "--", icon: "⏳", desc: "Cargando...", sunset: null, manana: null };
-let cachedLinkedin = [];
+let cachedLinkedin = linkedinService.getPlaceholderPosts();
 let cachedEventosPool = [];
 let cachedEventosCarouselAt = 0;
+let eventosCarouselRefreshPromise = null;
+const EVENTOS_CAROUSEL_CACHE_MS = 15 * 60 * 1000;
+const EVENTOS_CAROUSEL_DISPLAY_LIMIT = 30;
+const EVENTOS_CAROUSEL_LIST_LIMIT = 50;
 
 function shuffleArray(items) {
   const shuffled = [...items];
@@ -207,53 +186,84 @@ async function fetchNoticiasHome() {
   return { noticiaDestacada, noticiasLista, mixedFeed };
 }
 
-async function fetchEventosCarousel() {
-  const cacheMs = 15 * 60 * 1000;
-  if (Date.now() - cachedEventosCarouselAt < cacheMs) {
-    return shuffleArray(cachedEventosPool).slice(0, 30);
-  }
-
-  try {
-    const { rows: eventos } = await db.query(
-      `SELECT name, slug
-       FROM events
-       ORDER BY created_at DESC
-       LIMIT 10`,
-    );
-
-    const galerias = await Promise.all(
-      eventos.map(async (evento) => {
-        try {
-          const archivos = await fileStorage.listFiles(`eventos/${evento.slug}`);
-          return archivos
-            .filter((item) => item.resource_type === "image")
-            .map((item) => ({
-              image: item.url,
-              name: evento.name,
-              slug: evento.slug,
-              created_at: item.created_at,
-            }));
-        } catch (err) {
-          console.warn(
-            `[HOME] No se pudo leer galería de ${evento.slug}:`,
-            err.message,
-          );
-          return [];
-        }
-      }),
-    );
-
-    cachedEventosPool = galerias
-      .flat()
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    cachedEventosCarouselAt = Date.now();
-
-    return shuffleArray(cachedEventosPool).slice(0, 30);
-  } catch (err) {
-    console.error("[HOME] Error cargando galería de eventos:", err.message);
-    return shuffleArray(cachedEventosPool).slice(0, 30);
-  }
+function getEventosCarouselFromCache() {
+  return shuffleArray(cachedEventosPool).slice(0, EVENTOS_CAROUSEL_DISPLAY_LIMIT);
 }
+
+async function loadEventosCarouselPool() {
+  if (eventosCarouselRefreshPromise) {
+    return eventosCarouselRefreshPromise;
+  }
+
+  eventosCarouselRefreshPromise = (async () => {
+    try {
+      const { rows: eventos } = await db.query(
+        `SELECT name, slug
+         FROM events
+         ORDER BY created_at DESC
+         LIMIT 10`,
+      );
+
+      const galerias = await Promise.all(
+        eventos.map(async (evento) => {
+          try {
+            const archivos = await fileStorage.listFiles(`eventos/${evento.slug}`, {
+              limit: EVENTOS_CAROUSEL_LIST_LIMIT,
+            });
+            return archivos
+              .filter((item) => item.resource_type === "image")
+              .map((item) => ({
+                image: item.url,
+                name: evento.name,
+                slug: evento.slug,
+                created_at: item.created_at,
+              }));
+          } catch (err) {
+            console.warn(
+              `[HOME] No se pudo leer galería de ${evento.slug}:`,
+              err.message,
+            );
+            return [];
+          }
+        }),
+      );
+
+      cachedEventosPool = galerias
+        .flat()
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      cachedEventosCarouselAt = Date.now();
+    } catch (err) {
+      console.error("[HOME] Error cargando galería de eventos:", err.message);
+    } finally {
+      eventosCarouselRefreshPromise = null;
+    }
+  })();
+
+  return eventosCarouselRefreshPromise;
+}
+
+async function fetchEventosCarousel() {
+  const cacheFresh =
+    Date.now() - cachedEventosCarouselAt < EVENTOS_CAROUSEL_CACHE_MS;
+
+  if (cacheFresh && cachedEventosPool.length > 0) {
+    return getEventosCarouselFromCache();
+  }
+
+  if (cachedEventosPool.length > 0) {
+    loadEventosCarouselPool().catch((err) => {
+      console.error("[HOME] Error refrescando galería en background:", err.message);
+    });
+    return getEventosCarouselFromCache();
+  }
+
+  await loadEventosCarouselPool();
+  return getEventosCarouselFromCache();
+}
+
+loadEventosCarouselPool().catch((err) => {
+  console.warn("[HOME] Precarga de galería de eventos:", err.message);
+});
 
 // ==========================================
 // RUTA: HOME
@@ -461,6 +471,8 @@ router.get("/perfil", async (req, res) => {
   res.render("perfil", {
     titulo: "Mi Perfil",
     error: req.query.error || null,
+    passwordError: req.query.password_error || null,
+    openPasswordModal: req.query.openPasswordModal === "1",
     usuario: {
       ...raw,
       photo: raw.photo ?? raw.foto,
@@ -599,20 +611,15 @@ router.get("/cursos/equipamiento-activo", async (req, res) => {
   if (!req.session.user) return res.redirect("/login");
   try {
     const { rows: progreso } = await db.query(
-      "SELECT course_id AS curso_id, status AS estado_db, seconds_watched AS segundos_vistos FROM user_course_progress WHERE user_id = $1",
+      `SELECT ${COURSE_PROGRESS_COLUMNS} FROM user_course_progress WHERE user_id = $1`,
       [req.session.user.id],
     );
-    const progresoMap = buildProgresoMap(progreso);
+    const progresoMap = buildCourseProgressMap(progreso);
 
     const { rows: cursosRows } = await db.query(
       `${COURSE_LIST_BASE} WHERE c.section ILIKE '%Equipamiento%' AND c.is_active = true ORDER BY c.subsection ASC, c.title ASC`,
     );
-    const cursosAgrupados = {};
-    cursosRows.forEach((curso) => {
-      const sub = curso.subseccion || "Otros";
-      if (!cursosAgrupados[sub]) cursosAgrupados[sub] = [];
-      cursosAgrupados[sub].push(curso);
-    });
+    const cursosAgrupados = groupCoursesBySubsection(cursosRows);
 
     const { rows: materiales } = await db.query(
       `SELECT ${MATERIAL_VIEW_COLUMNS} FROM study_materials WHERE section = 'Equipamiento Activo' ORDER BY created_at DESC`,
@@ -625,7 +632,7 @@ router.get("/cursos/equipamiento-activo", async (req, res) => {
       active: "equipamiento",
       progresoUsuario: progresoMap,
       cursosAgrupados,
-      materiales,
+      materiales: materiales.map(mapStudyMaterialForView),
     });
   } catch (err) {
     console.error(err);
@@ -640,20 +647,15 @@ router.get("/cursos/fibra-optica", async (req, res) => {
   if (!req.session.user) return res.redirect("/login");
   try {
     const { rows: progreso } = await db.query(
-      "SELECT course_id AS curso_id, status AS estado_db, seconds_watched AS segundos_vistos FROM user_course_progress WHERE user_id = $1",
+      `SELECT ${COURSE_PROGRESS_COLUMNS} FROM user_course_progress WHERE user_id = $1`,
       [req.session.user.id],
     );
-    const progresoMap = buildProgresoMap(progreso);
+    const progresoMap = buildCourseProgressMap(progreso);
 
     const { rows: cursosRows } = await db.query(
       `${COURSE_LIST_BASE} WHERE c.section ILIKE '%Fibra%' AND c.is_active = true ORDER BY c.subsection ASC, c.title ASC`,
     );
-    const cursosAgrupados = {};
-    cursosRows.forEach((curso) => {
-      const sub = curso.subseccion || "Otros";
-      if (!cursosAgrupados[sub]) cursosAgrupados[sub] = [];
-      cursosAgrupados[sub].push(curso);
-    });
+    const cursosAgrupados = groupCoursesBySubsection(cursosRows);
 
     const { rows: materiales } = await db.query(
       `SELECT ${MATERIAL_VIEW_COLUMNS} FROM study_materials WHERE section = 'Fibra Óptica' ORDER BY created_at DESC`,
@@ -666,7 +668,7 @@ router.get("/cursos/fibra-optica", async (req, res) => {
       active: "fibra",
       progresoUsuario: progresoMap,
       cursosAgrupados,
-      materiales,
+      materiales: materiales.map(mapStudyMaterialForView),
     });
   } catch (err) {
     console.error(err);
@@ -681,20 +683,15 @@ router.get("/cursos/infraestructura", async (req, res) => {
   if (!req.session.user) return res.redirect("/login");
   try {
     const { rows: progreso } = await db.query(
-      "SELECT course_id AS curso_id, status AS estado_db, seconds_watched AS segundos_vistos FROM user_course_progress WHERE user_id = $1",
+      `SELECT ${COURSE_PROGRESS_COLUMNS} FROM user_course_progress WHERE user_id = $1`,
       [req.session.user.id],
     );
-    const progresoMap = buildProgresoMap(progreso);
+    const progresoMap = buildCourseProgressMap(progreso);
 
     const { rows: cursosRows } = await db.query(
       `${COURSE_LIST_BASE} WHERE c.section ILIKE '%Infraestructura%' AND c.is_active = true ORDER BY c.subsection ASC, c.title ASC`,
     );
-    const cursosAgrupados = {};
-    cursosRows.forEach((curso) => {
-      const sub = curso.subseccion || "Otros";
-      if (!cursosAgrupados[sub]) cursosAgrupados[sub] = [];
-      cursosAgrupados[sub].push(curso);
-    });
+    const cursosAgrupados = groupCoursesBySubsection(cursosRows);
 
     const { rows: materiales } = await db.query(
       `SELECT ${MATERIAL_VIEW_COLUMNS} FROM study_materials WHERE section = 'Infraestructura' ORDER BY created_at DESC`,
@@ -707,7 +704,7 @@ router.get("/cursos/infraestructura", async (req, res) => {
       active: "infraestructura",
       progresoUsuario: progresoMap,
       cursosAgrupados,
-      materiales,
+      materiales: materiales.map(mapStudyMaterialForView),
     });
   } catch (err) {
     console.error(err);
@@ -722,20 +719,15 @@ router.get("/cursos/safety-machine", async (req, res) => {
   if (!req.session.user) return res.redirect("/login");
   try {
     const { rows: progreso } = await db.query(
-      "SELECT course_id AS curso_id, status AS estado_db, seconds_watched AS segundos_vistos FROM user_course_progress WHERE user_id = $1",
+      `SELECT ${COURSE_PROGRESS_COLUMNS} FROM user_course_progress WHERE user_id = $1`,
       [req.session.user.id],
     );
-    const progresoMap = buildProgresoMap(progreso);
+    const progresoMap = buildCourseProgressMap(progreso);
 
     const { rows: cursosRows } = await db.query(
-      `${COURSE_LIST_BASE} WHERE c.section ILIKE '%Seguridad%' AND c.is_active = true ORDER BY c.subsection ASC, c.title ASC`,
+      `${COURSE_LIST_BASE} WHERE (c.section ILIKE '%Safety%' OR c.section ILIKE '%Seguridad%') AND c.is_active = true ORDER BY c.subsection ASC, c.title ASC`,
     );
-    const cursosAgrupados = {};
-    cursosRows.forEach((curso) => {
-      const sub = curso.subseccion || "Otros";
-      if (!cursosAgrupados[sub]) cursosAgrupados[sub] = [];
-      cursosAgrupados[sub].push(curso);
-    });
+    const cursosAgrupados = groupCoursesBySubsection(cursosRows);
 
     const { rows: materiales } = await db.query(
       `SELECT ${MATERIAL_VIEW_COLUMNS} FROM study_materials WHERE section = 'Safety Machine' ORDER BY created_at DESC`,
@@ -748,7 +740,7 @@ router.get("/cursos/safety-machine", async (req, res) => {
       active: "safety-machine",
       progresoUsuario: progresoMap,
       cursosAgrupados,
-      materiales,
+      materiales: materiales.map(mapStudyMaterialForView),
     });
   } catch (err) {
     console.error(err);
@@ -931,26 +923,26 @@ router.get("/cursos/reproductor/:id", async (req, res) => {
     );
     if (cursoRows.length === 0)
       return res.status(404).send("Curso no encontrado");
-    const cursoDb = mapCursoRow(cursoRows[0]);
+    const cursoDb = mapCourseForView(cursoRows[0]);
 
     const { rows: progresoRows } = await db.query(
-      "SELECT seconds_watched AS segundos_vistos FROM user_course_progress WHERE user_id = $1 AND course_id = $2",
+      "SELECT seconds_watched FROM user_course_progress WHERE user_id = $1 AND course_id = $2",
       [usuarioId, cursoId],
     );
     const progresoGuardado =
-      progresoRows.length > 0 ? progresoRows[0].segundos_vistos : 0;
+      progresoRows.length > 0 ? progresoRows[0].seconds_watched : 0;
 
     res.render("cursos/reproductor", {
-      titulo: `${cursoDb.titulo} | Transworld`,
+      titulo: `${cursoDb.title} | Transworld`,
       pageTitle: "Reproductor de Curso",
       user: req.session.user,
       active: "equipamiento",
       curso: {
         id: cursoDb.id,
-        titulo: cursoDb.titulo,
-        descripcion: cursoDb.descripcion,
+        title: cursoDb.title,
+        description: cursoDb.description,
         youtubeId: cursoDb.video_url,
-        tiempoRequerido: cursoDb.tiempo_requerido_segundos,
+        tiempoRequerido: cursoDb.required_watch_seconds,
       },
       progresoGuardado,
     });
@@ -1003,24 +995,26 @@ router.get("/cursos/evaluacion/:id", async (req, res) => {
     if (cursoRows.length === 0)
       return res.status(404).send("Curso no encontrado");
 
+    const curso = mapCourseForView(cursoRows[0]);
+
     const { rows: userProg } = await db.query(
-      "SELECT status AS estado_db, score AS nota, attempts AS intentos FROM user_course_progress WHERE user_id = $1 AND course_id = $2",
+      "SELECT status, score, attempts FROM user_course_progress WHERE user_id = $1 AND course_id = $2",
       [usuarioId, cursoId],
     );
     const progreso = userProg.length > 0 ? userProg[0] : null;
 
-    const yaEvaluado = progreso && courseStatusFromDb(progreso.estado_db) === "Evaluado";
-    const notaGuardada = progreso ? progreso.nota : null;
-    const intentosTotales = progreso ? progreso.intentos || 0 : 0;
+    const yaEvaluado = progreso && progreso.status === "evaluated";
+    const notaGuardada = progreso ? progreso.score : null;
+    const intentosTotales = progreso ? progreso.attempts || 0 : 0;
 
     const { rows: preguntasRows } = await db.query(
-      "SELECT id, question_text AS enunciado, sort_order AS orden FROM questions WHERE course_id = $1 ORDER BY sort_order ASC",
+      "SELECT id, question_text, sort_order FROM questions WHERE course_id = $1 ORDER BY sort_order ASC",
       [cursoId],
     );
 
     for (let p of preguntasRows) {
       const { rows: altRows } = await db.query(
-        "SELECT id, text AS texto FROM question_options WHERE question_id = $1 ORDER BY id ASC",
+        "SELECT id, text FROM question_options WHERE question_id = $1 ORDER BY id ASC",
         [p.id],
       );
       p.alternativas = altRows;
@@ -1039,12 +1033,12 @@ router.get("/cursos/evaluacion/:id", async (req, res) => {
     }
 
     res.render("cursos/evaluacion", {
-      titulo: `Evaluación: ${mapCursoRow(cursoRows[0]).titulo} | Transworld`,
+      titulo: `Evaluación: ${curso.title} | Transworld`,
       pageTitle: "Evaluación de Curso",
       user: req.session.user,
       active: "equipamiento",
-      curso: mapCursoRow(cursoRows[0]),
-      preguntas: preguntasRows.map(mapPreguntaRow),
+      curso,
+      preguntas: preguntasRows.map(mapQuestionForView),
       yaEvaluado,
       notaGuardada,
       intentosTotales,
@@ -1136,52 +1130,90 @@ router.post("/cursos/api/reintentar/:id", async (req, res) => {
 // ==========================================
 // RUTA: DASHBOARD KPI DE CURSOS
 // ==========================================
+function buildKpiPorCursoFromRows(rows) {
+  const byCourse = new Map();
+  rows.forEach((row) => {
+    if (!byCourse.has(row.course_id)) {
+      byCourse.set(row.course_id, {
+        course_id: row.course_id,
+        curso_titulo: row.title,
+        section: row.section,
+        subsection: row.subsection,
+        top10: [],
+      });
+    }
+    byCourse.get(row.course_id).top10.push({
+      nombre_usuario: row.nombre_usuario,
+      score: row.score,
+    });
+  });
+  return Array.from(byCourse.values());
+}
+
 router.get("/kpi-cursos", async (req, res) => {
+  if (!req.session.user) return res.redirect("/login");
+
   try {
     const queryRanking = `
       SELECT 
         u.id AS usuario_id,
-        u.first_name || ' ' || COALESCE(u.last_name, '') AS nombre_usuario,
-        SUM(cu.score) AS puntaje_total,
-        COUNT(cu.course_id) AS cursos_completados
-      FROM user_course_progress cu
-      JOIN users u ON cu.user_id = u.id
-      WHERE cu.status = 'evaluated'
-      GROUP BY u.id, u.first_name, u.last_name
-      ORDER BY puntaje_total DESC, cursos_completados DESC
+        TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS nombre_usuario,
+        u.email,
+        COALESCE(SUM(cu.score) FILTER (WHERE cu.status = 'evaluated'), 0) AS puntaje_total,
+        COUNT(cu.course_id) FILTER (WHERE cu.status = 'evaluated') AS cursos_completados,
+        COUNT(cu.course_id) FILTER (WHERE cu.status = 'in_progress') AS cursos_en_curso
+      FROM users u
+      LEFT JOIN user_course_progress cu ON cu.user_id = u.id
+      WHERE u.role IS DISTINCT FROM $1
+      GROUP BY u.id, u.first_name, u.last_name, u.email
+      HAVING COUNT(cu.course_id) FILTER (WHERE cu.status = 'evaluated') > 0
+      ORDER BY puntaje_total DESC, cursos_completados DESC, nombre_usuario ASC
     `;
-    const { rows: todosLosRanking } = await db.query(queryRanking);
+    const { rows: todosLosRanking } = await db.query(queryRanking, [
+      ROLES.DESHABILITADO,
+    ]);
     const top10Ranking = todosLosRanking.slice(0, 10);
 
-    const queryCursos = `SELECT id, title AS titulo, section AS seccion, subsection AS subseccion FROM courses WHERE is_active = true`;
-    const { rows: cursos } = await db.query(queryCursos);
+    const { rows: cursos } = await db.query(
+      `SELECT id, title, section, subsection
+       FROM courses
+       WHERE is_active = true
+       ORDER BY section NULLS LAST, subsection NULLS LAST, title ASC`,
+    );
+    const catalogoCursos = cursos.map(mapCourseCatalogRow);
 
-    const kpiPorCursoPromises = cursos.map(async (curso) => {
-      const queryNotasCurso = `
-        SELECT 
-          u.first_name || ' ' || COALESCE(u.last_name, '') AS nombre_usuario,
-          cu.score AS nota
-        FROM user_course_progress cu
-        JOIN users u ON cu.user_id = u.id
-        WHERE cu.course_id = $1 AND cu.score IS NOT NULL AND cu.score > 0
-        ORDER BY cu.score DESC
-        LIMIT 10
-      `;
-      const { rows: notasCurso } = await db.query(queryNotasCurso, [curso.id]);
+    const { rows: notasRows } = await db.query(
+      `WITH ranked AS (
+        SELECT
+          c.id AS course_id,
+          c.title,
+          c.section,
+          c.subsection,
+          TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS nombre_usuario,
+          cu.score,
+          ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY cu.score DESC NULLS LAST) AS rn
+        FROM courses c
+        INNER JOIN user_course_progress cu ON cu.course_id = c.id
+        INNER JOIN users u ON u.id = cu.user_id
+        WHERE c.is_active = true
+          AND cu.score IS NOT NULL
+          AND cu.score > 0
+      )
+      SELECT course_id, title, section, subsection, nombre_usuario, score
+      FROM ranked
+      WHERE rn <= 10
+      ORDER BY section NULLS LAST, subsection NULLS LAST, title ASC, score DESC`,
+    );
+    const kpiPorCurso = buildKpiPorCursoFromRows(notasRows);
 
-      if (notasCurso.length > 0) {
-        return {
-          curso_titulo: curso.titulo,
-          seccion: curso.seccion,
-          subseccion: curso.subseccion,
-          top10: notasCurso,
-        };
-      }
-      return null;
-    });
-
-    const resultadosBrutos = await Promise.all(kpiPorCursoPromises);
-    const kpiPorCurso = resultadosBrutos.filter((kpi) => kpi !== null);
+    const { rows: statsRows } = await db.query(
+      `SELECT
+        (SELECT COUNT(*) FROM courses WHERE is_active = true) AS total_cursos,
+        (SELECT COUNT(DISTINCT user_id) FROM user_course_progress WHERE status = 'evaluated') AS integrantes_con_completados,
+        (SELECT COUNT(*) FROM user_course_progress WHERE status = 'evaluated') AS total_completados,
+        (SELECT COUNT(*) FROM user_course_progress WHERE status = 'in_progress') AS total_en_curso`,
+    );
+    const stats = statsRows[0] || {};
 
     res.render("kpi-cursos", {
       titulo: "KPI Cursos | Transworld",
@@ -1191,10 +1223,109 @@ router.get("/kpi-cursos", async (req, res) => {
       todosLosRanking,
       top10Ranking,
       kpiPorCurso,
+      catalogoCursos,
+      stats,
     });
   } catch (err) {
     console.error("Error cargando Dashboard KPI Cursos:", err);
     res.status(500).send("Error interno cargando los indicadores.");
+  }
+});
+
+router.get("/kpi-cursos/api/integrantes", async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: "No autorizado" });
+
+  const q = String(req.query.q || "").trim();
+  if (q.length < 2) {
+    return res.json([]);
+  }
+
+  try {
+    const { rows } = await db.query(
+      `SELECT
+        u.id,
+        TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS name,
+        u.email
+      FROM users u
+      WHERE u.role IS DISTINCT FROM $2
+        AND (
+          u.first_name ILIKE $1
+          OR u.last_name ILIKE $1
+          OR u.email ILIKE $1
+          OR TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) ILIKE $1
+        )
+      ORDER BY name ASC
+      LIMIT 12`,
+      [`%${q}%`, ROLES.DESHABILITADO],
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error buscando integrantes KPI:", err);
+    res.status(500).json({ error: "Error al buscar integrantes" });
+  }
+});
+
+router.get("/kpi-cursos/api/integrantes/:id", async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: "No autorizado" });
+
+  const userId = req.params.id;
+
+  try {
+    const { rows: userRows } = await db.query(
+      `SELECT
+        u.id,
+        TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS name,
+        u.email,
+        u.role
+      FROM users u
+      WHERE u.id = $1 AND u.role IS DISTINCT FROM $2`,
+      [userId, ROLES.DESHABILITADO],
+    );
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: "Integrante no encontrado" });
+    }
+
+    const { rows: progressRows } = await db.query(
+      `SELECT
+        c.id AS course_id,
+        c.title,
+        c.section,
+        c.subsection,
+        c.required_watch_seconds,
+        cu.id AS progress_id,
+        cu.status,
+        cu.score,
+        cu.attempts,
+        cu.seconds_watched,
+        cu.started_at,
+        cu.completed_at
+      FROM courses c
+      LEFT JOIN user_course_progress cu
+        ON cu.course_id = c.id AND cu.user_id = $1
+      WHERE c.is_active = true
+      ORDER BY c.section NULLS LAST, c.subsection NULLS LAST, c.title ASC`,
+      [userId],
+    );
+
+    const courses = progressRows.map(mapIntegranteCourseProgress);
+    const summary = {
+      total_cursos: courses.length,
+      completados: courses.filter((c) => c.status === "evaluated").length,
+      en_curso: courses.filter((c) => c.status === "in_progress").length,
+      sin_iniciar: courses.filter((c) => !c.status).length,
+      puntaje_total: courses
+        .filter((c) => c.status === "evaluated" && c.score != null)
+        .reduce((sum, c) => sum + c.score, 0),
+    };
+
+    res.json({
+      user: userRows[0],
+      summary,
+      courses,
+    });
+  } catch (err) {
+    console.error("Error obteniendo progreso integrante KPI:", err);
+    res.status(500).json({ error: "Error al cargar el progreso del integrante" });
   }
 });
 

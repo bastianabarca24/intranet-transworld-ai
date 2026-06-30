@@ -12,6 +12,12 @@ const {
   mapTicketReplyForView,
 } = require("../utils/schemaMappers");
 const fileStorage = require('../services/fileStorage');
+const holidayService = require("../services/vacations/holidayService");
+const {
+  countBusinessMinutes,
+  formatBusinessDuration,
+  getSantiagoDateOnly,
+} = require("../utils/businessHours");
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -184,9 +190,42 @@ router.get("/tickets", async (req, res) => {
 
   try {
     const { rows: results } = await db.query(sql, params);
+
+    let holidaySet = new Set();
+    const ticketsWithResponse = results.filter(
+      (t) => t.created_at && t.fecha_ultima_respuesta,
+    );
+    if (ticketsWithResponse.length > 0) {
+      const rangeStart = ticketsWithResponse.reduce((min, t) => {
+        const d = getSantiagoDateOnly(new Date(t.created_at));
+        return d < min ? d : min;
+      }, getSantiagoDateOnly(new Date(ticketsWithResponse[0].created_at)));
+      const rangeEnd = ticketsWithResponse.reduce((max, t) => {
+        const d = getSantiagoDateOnly(new Date(t.fecha_ultima_respuesta));
+        return d > max ? d : max;
+      }, getSantiagoDateOnly(new Date(ticketsWithResponse[0].fecha_ultima_respuesta)));
+      holidaySet = await holidayService.getHolidaySet("CL", rangeStart, rangeEnd);
+    }
+
+    const tickets = results.map((ticket) => {
+      if (!ticket.created_at || !ticket.fecha_ultima_respuesta) {
+        return { ...ticket, tiempo_respuesta: "-", tiempo_respuesta_minutos: null };
+      }
+      const minutos = countBusinessMinutes(
+        ticket.created_at,
+        ticket.fecha_ultima_respuesta,
+        holidaySet,
+      );
+      return {
+        ...ticket,
+        tiempo_respuesta: formatBusinessDuration(minutos),
+        tiempo_respuesta_minutos: minutos,
+      };
+    });
+
     res.render("sistemas/tickets", {
       titulo: "Soporte",
-      tickets: results,
+      tickets,
       user: user,
     });
   } catch (err) {

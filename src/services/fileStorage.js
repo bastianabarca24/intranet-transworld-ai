@@ -73,9 +73,9 @@ async function deleteFolder(folder) {
   return sharepoint.deleteFolder(folder);
 }
 
-async function listFiles(folder) {
+async function listFiles(folder, { limit } = {}) {
   const folderClean = sharepoint.normalizeRelativePath(folder);
-  const items = await sharepoint.listFilesInFolder(folderClean);
+  const items = await sharepoint.listFilesInFolder(folderClean, { limit });
 
   return items.map((item) => ({
     public_id: item.relativePath,

@@ -8,8 +8,22 @@ const CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET;
 const ORG_ID = process.env.LINKEDIN_ORG_ID;
 const LINKEDIN_IMAGES_FOLDER = "linkedin_posts";
 const FALLBACK_IMAGE = "/img/fondo-home.png";
+const LINKEDIN_PLACEHOLDER_IMAGE = "/img/linkedin_off.jpg";
+const LINKEDIN_COMPANY_URL =
+  "https://www.linkedin.com/company/transworldpowerandtelecom";
+const LINKEDIN_ENABLED = process.env.LINKEDIN_ENABLED === "true";
 const LINKEDIN_API_VERSION =
   process.env.LINKEDIN_API_VERSION?.trim() || "202601";
+
+function getPlaceholderPosts() {
+  return [
+    {
+      text: "Síguenos en LinkedIn",
+      image_url: LINKEDIN_PLACEHOLDER_IMAGE,
+      link_url: LINKEDIN_COMPANY_URL,
+    },
+  ];
+}
 
 function stripTrailingSlash(value) {
   return String(value || "").replace(/\/$/, "");
@@ -399,6 +413,10 @@ async function fetchPostsFromApi(accessToken) {
 }
 
 async function getCompanyPosts() {
+  if (!LINKEDIN_ENABLED) {
+    return getPlaceholderPosts();
+  }
+
   let accessToken = await getAccessToken();
   if (!accessToken) {
     const cached = await getPostsFromDb();
@@ -456,6 +474,7 @@ module.exports = {
   getAuthorizationUrl,
   exchangeCodeForToken,
   getCompanyPosts,
+  getPlaceholderPosts,
   getRedirectUri,
   getReauthUrl,
 };

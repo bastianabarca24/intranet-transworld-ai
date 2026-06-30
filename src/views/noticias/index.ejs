@@ -1,24 +1,6 @@
 <style>
   .contenedor-noticias {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px 20px 80px;
-    font-family: system-ui, -apple-system, sans-serif;
-  }
-
-  .page-title {
-    color: #003a70;
-    font-size: 1.8rem;
-    font-weight: 800;
-    margin: 0 0 10px 0;
-    border-bottom: 2px solid #003a70;
-    padding-bottom: 10px;
-  }
-
-  .page-description {
-    color: #4a5568;
-    font-size: 1rem;
-    margin: 0 0 25px 0;
+    padding-bottom: 80px;
   }
 
   .alerta-ok {
@@ -195,9 +177,11 @@
   }
 </style>
 
-<div class="contenedor-noticias">
-  <h2 class="page-title">Noticias y Comunicados</h2>
-  <p class="page-description">Entérate de las últimas novedades de Transworld.</p>
+<div class="contenedor contenedor-noticias">
+  <div class="page-header">
+    <h2 class="page-title">Noticias y Comunicados</h2>
+    <p class="page-description">Entérate de las últimas novedades de Transworld.</p>
+  </div>
 
   <% if (typeof ok !== 'undefined' && ok) { %>
     <div class="alerta-ok"><%= ok %></div>

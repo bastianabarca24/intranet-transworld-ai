@@ -3,22 +3,23 @@
     <a href="/marketing/eventos" class="link-volver">← Volver a Eventos</a>
   </div>
 
-  <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
-    <h2 class="page-title" style="margin: 0;">Evento: <%= evento.name %></h2>
+  <div class="page-header page-header--toolbar">
+    <div class="page-header__text">
+      <h2 class="page-title">Evento: <%= evento.name %></h2>
+      <% if (evento.description) { %>
+        <p class="page-description" style="font-style: italic;"><%= evento.description %></p>
+      <% } %>
+    </div>
 
     <% if (can.eventos_write) { %>
+    <div class="page-header-actions">
       <a href="/marketing/eventos/<%= evento.slug %>/editar" title="Editar título y descripción"
          style="text-decoration: none; font-size: 0.95rem; font-weight: 600; color: #003a70;">
         Editar
       </a>
+    </div>
     <% } %>
   </div>
-
-  <% if (evento.description) { %>
-    <p class="page-description" style="margin-bottom: 25px; font-style: italic; color: #555;">
-      <%= evento.description %>
-    </p>
-  <% } %>
 
   <% if (can.eventos_write) { %>
     <div class="panel" style="margin-bottom: 30px;">
@@ -146,10 +147,6 @@
 <style>
   /* ====== NUEVOS ESTILOS DEL FRONTEND DE SUBIDA ====== */
 
-  .contenedor { max-width: 1200px; margin: 0 auto; padding: 20px; font-family: system-ui, -apple-system, sans-serif; }
-  .page-title { color: #003a70; font-size: 1.8rem; font-weight: 800; border-bottom: 2px solid #003a70; padding-bottom: 10px; }
-  .page-description { color: #4a5568; font-size: 1rem; margin-bottom: 25px; }
-  
   .link-volver { display: inline-block; background: #f8fafc; border: 1px solid #cbd5e0; color: #4a5568; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
   .link-volver:hover { background: #edf2f7; color: #1a202c; }
   

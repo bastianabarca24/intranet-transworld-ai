@@ -4,15 +4,16 @@
   const rolFmt = usuario.role || 'Usuario';
   const correoVerificado = usuario.email_confirmed ? 'Verificado' : 'Pendiente de verificación';
   const errorPerfil = typeof error !== 'undefined' ? error : null;
+  const passwordErrorModal = typeof passwordError !== 'undefined' ? passwordError : null;
+  const abrirModalPassword = typeof openPasswordModal !== 'undefined' ? openPasswordModal : false;
 %>
 <link rel="stylesheet" href="/css/horizontal-forms.css">
 <link rel="stylesheet" href="/css/phone-chile.css">
 <link rel="stylesheet" href="/css/profile-photo-crop.css">
+<link rel="stylesheet" href="/css/change-password-modal.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 
 <div class="contenedor-formulario perfil-container">
-
-  <a href="/" class="link-volver">← Volver al inicio</a>
 
   <div class="form-card layout-horizontal-form">
     <aside class="form-aside">
@@ -35,10 +36,14 @@
               <%= tieneFoto ? 'Cambiar foto' : 'Seleccionar foto' %>
             </button>
             <button type="button" class="btn-photo-remove" id="btn-remove-photo" <%= tieneFoto ? '' : 'hidden' %>>Quitar foto</button>
-            <span class="profile-photo-hint profile-photo-hint--light">Recorta la imagen en formato circular · JPG, PNG o WebP · Máx. 5 MB</span>
+            <span class="profile-photo-hint profile-photo-hint--light">JPG, PNG o WebP · Máx. 5 MB</span>
           </div>
         </div>
         <input type="file" id="foto" name="foto" accept="image/*" hidden>
+      </div>
+
+      <div class="perfil-aside-actions">
+        <a href="/perfil/cursos" class="btn-perfil">🎓 Mis cursos</a>
       </div>
     </aside>
 
@@ -104,22 +109,17 @@
           </div>
         </div>
 
-        <div class="perfil-form-actions">
-          <button type="submit" class="btn-guardar-perfil">Guardar cambios</button>
+        <div class="perfil-form-footer">
+          <button type="button" class="btn-perfil btn-perfil--spaced" id="btnOpenChangePassword">Cambiar contraseña</button>
+          <button type="submit" class="btn-perfil btn-perfil--primary">Guardar cambios</button>
+          <a href="/logout" class="btn-perfil btn-perfil--danger">Cerrar sesión</a>
         </div>
       </form>
-
-      <div class="perfil-acciones">
-        <a href="/change-password" class="link-cambiar-pass">Cambiar contraseña</a>
-        <a href="/perfil/cursos" class="btn-ver-cursos">🎓 Mis cursos</a>
-      </div>
-
-      <a href="/logout" class="btn-logout-card">
-        Cerrar Sesión
-      </a>
     </main>
   </div>
 </div>
+
+<%- include('partials/change-password-modal') %>
 
 <div class="foto-crop-overlay" id="fotoCropOverlay" role="dialog" aria-modal="true" aria-labelledby="fotoCropTitle" hidden>
   <div class="foto-crop-modal">
@@ -144,12 +144,25 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="/js/phone-chile.js"></script>
 <script src="/js/profile-photo-cropper.js"></script>
+<script src="/js/change-password-modal.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const btnRemove = document.getElementById('btn-remove-photo');
     const telefonoField = document.querySelector('[data-phone-chile]');
 
     PhoneChile.initField(telefonoField);
+
+    ChangePasswordModal.init({
+      overlayId: 'changePasswordModal',
+      openBtnId: 'btnOpenChangePassword',
+      formId: 'changePasswordForm',
+      errorElId: 'changePasswordError',
+      closeBtnId: 'changePasswordClose',
+      cancelBtnId: 'changePasswordCancel',
+      submitBtnId: 'changePasswordSubmit',
+      initialError: <%- JSON.stringify(passwordErrorModal) %>,
+      openOnLoad: <%= abrirModalPassword ? 'true' : 'false' %>
+    });
 
     ProfilePhotoCropper.init({
       fileInputId: 'foto',
